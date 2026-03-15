@@ -45,3 +45,11 @@ test_env/
 
 # Compiled bytecode
 *.pyc
+
+
+bin/
+voices/
+output/
+logs/
+*.wav
+*.mp4
