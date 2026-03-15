@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shortz — Monitoring Dashboard</title>
+    <meta name="description" content="Real-time monitoring dashboard for the Shortz AI video generation platform" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        surface:  { DEFAULT: '#0f1117', card: '#181b23', hover: '#1e222d' },
+                        accent:   { DEFAULT: '#6366f1', glow: '#818cf8' },
+                        emerald:  { soft: '#34d399' },
+                        rose:     { soft: '#fb7185' },
+                        amber:    { soft: '#fbbf24' },
+                        sky:      { soft: '#38bdf8' },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        body { background: #0f1117; }
+        .glow-card { box-shadow: 0 0 0 1px rgba(99,102,241,.15), 0 4px 24px rgba(0,0,0,.4); }
+        .glow-card:hover { box-shadow: 0 0 0 1px rgba(99,102,241,.3), 0 8px 32px rgba(0,0,0,.5); }
+        .pulse-dot { animation: pulse-ring 2s ease-in-out infinite; }
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: .5; transform: scale(1.3); }
+        }
+        .fade-in { animation: fadeIn .4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .status-badge { @apply px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #181b23; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    </style>
+</head>
+<body class="text-gray-200 font-sans antialiased min-h-screen">
+
+    <!-- ============ HEADER ============ -->
+    <header class="sticky top-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center text-white font-extrabold text-sm">S</div>
+                <h1 class="text-xl font-bold tracking-tight text-white">Shortz <span class="text-accent-glow font-medium text-base">Monitor</span></h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="connection-status" class="flex items-center gap-1.5 text-xs text-emerald-soft">
+                    <span class="w-2 h-2 rounded-full bg-emerald-soft pulse-dot"></span> Connected
+                </span>
+                <span id="last-update" class="text-xs text-gray-500">—</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+        <!-- ============ TOP KPI CARDS ============ -->
+        <section id="kpi-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4 fade-in">
+            <!-- Queue Length -->
+            <div class="glow-card rounded-2xl bg-surface-card p-5 transition-all duration-300">
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Queue</p>
+                <p id="kpi-queue" class="text-3xl font-extrabold text-sky-soft">—</p>
+                <p class="text-xs text-gray-500 mt-1">waiting jobs</p>
+            </div>
+            <!-- Running -->
+            <div class="glow-card rounded-2xl bg-surface-card p-5 transition-all duration-300">
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Running</p>
+                <p id="kpi-running" class="text-3xl font-extrabold text-amber-soft">—</p>
+                <p class="text-xs text-gray-500 mt-1">active workers</p>
+            </div>
+            <!-- Completed -->
+            <div class="glow-card rounded-2xl bg-surface-card p-5 transition-all duration-300">
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Completed</p>
+                <p id="kpi-complete" class="text-3xl font-extrabold text-emerald-soft">—</p>
+                <p class="text-xs text-gray-500 mt-1">successful jobs</p>
+            </div>
+            <!-- Failed -->
+            <div class="glow-card rounded-2xl bg-surface-card p-5 transition-all duration-300">
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Failed</p>
+                <p id="kpi-failed" class="text-3xl font-extrabold text-rose-soft">—</p>
+                <p class="text-xs text-gray-500 mt-1">error jobs</p>
+            </div>
+        </section>
+
+        <!-- ============ MIDDLE ROW — WORKER + GPU ============ -->
+        <section class="grid md:grid-cols-2 gap-6 fade-in">
+
+            <!-- Worker Status -->
+            <div class="glow-card rounded-2xl bg-surface-card p-6">
+                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Worker Status
+                </h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-xs text-gray-500">Status</p>
+                        <p id="worker-status" class="text-sm font-semibold text-emerald-soft">—</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Uptime</p>
+                        <p id="worker-uptime" class="text-sm font-semibold text-white">—</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Jobs Processed</p>
+                        <p id="worker-processed" class="text-sm font-semibold text-white">—</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Avg Job Time</p>
+                        <p id="worker-avg" class="text-sm font-semibold text-white">—</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPU Status -->
+            <div class="glow-card rounded-2xl bg-surface-card p-6">
+                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    GPU Status
+                </h2>
+                <div id="gpu-panel" class="text-sm text-gray-400">Loading…</div>
+            </div>
+
+        </section>
+
+        <!-- ============ SYSTEM HEALTH ============ -->
+        <section class="glow-card rounded-2xl bg-surface-card p-6 fade-in">
+            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                System Health
+            </h2>
+            <div id="health-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center"><p class="text-xs text-gray-500 mb-1">Redis</p><p id="health-redis" class="status-badge bg-gray-700 text-gray-400">—</p></div>
+                <div class="text-center"><p class="text-xs text-gray-500 mb-1">API</p><p id="health-api" class="status-badge bg-gray-700 text-gray-400">—</p></div>
+                <div class="text-center"><p class="text-xs text-gray-500 mb-1">Worker</p><p id="health-worker" class="status-badge bg-gray-700 text-gray-400">—</p></div>
+                <div class="text-center"><p class="text-xs text-gray-500 mb-1">GPU</p><p id="health-gpu" class="status-badge bg-gray-700 text-gray-400">—</p></div>
+            </div>
+        </section>
+
+        <!-- ============ JOB HISTORY TABLE ============ -->
+        <section class="glow-card rounded-2xl bg-surface-card p-6 fade-in">
+            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Job History
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 text-xs uppercase tracking-wider border-b border-white/5">
+                            <th class="pb-3 pr-4">Job ID</th>
+                            <th class="pb-3 pr-4">Status</th>
+                            <th class="pb-3 pr-4">Created</th>
+                            <th class="pb-3 pr-4">Updated</th>
+                            <th class="pb-3">Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobs-tbody" class="divide-y divide-white/5">
+                        <tr><td colspan="5" class="py-8 text-center text-gray-500">Loading jobs…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-gray-600">
+        Shortz Monitoring Dashboard · Auto-refreshes every 5 s
+    </footer>
+
+    <!-- ============ JS ============ -->
+    <script>
+    const BASE = window.location.origin;
+    const $  = (id) => document.getElementById(id);
+
+    // ---- Helpers ----
+    function statusColor(s) {
+        if (!s) return ['bg-gray-700', 'text-gray-400'];
+        s = s.toLowerCase();
+        if (s === 'complete' || s === 'healthy' || s === 'active' || s === 'available') return ['bg-emerald-500/20', 'text-emerald-400'];
+        if (s === 'running')  return ['bg-amber-500/20',   'text-amber-400'];
+        if (s === 'queued')   return ['bg-sky-500/20',      'text-sky-400'];
+        if (s === 'failed' || s.startsWith('unhealthy'))  return ['bg-rose-500/20',    'text-rose-400'];
+        if (s === 'idle')     return ['bg-gray-500/20',    'text-gray-400'];
+        return ['bg-gray-700', 'text-gray-400'];
+    }
+
+    function setBadge(el, text) {
+        el.textContent = text || '—';
+        el.className = 'status-badge ' + statusColor(text).join(' ');
+    }
+
+    function fmtTimestamp(ts) {
+        if (!ts) return '—';
+        const d = new Date(parseInt(ts) * 1000);
+        return d.toLocaleString();
+    }
+
+    function fmtUptime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return `${h}h ${m}m ${s}s`;
+    }
+
+    // ---- Data fetchers ----
+
+    async function fetchQueue() {
+        try {
+            const res = await fetch(BASE + '/queue');
+            const data = await res.json();
+            $('kpi-queue').textContent    = data.queue_length ?? '—';
+            $('kpi-running').textContent  = data.jobs_by_status?.running ?? data.workers_active ?? '—';
+            $('kpi-complete').textContent = data.jobs_by_status?.complete ?? '—';
+            $('kpi-failed').textContent   = data.jobs_by_status?.failed ?? '—';
+        } catch { setDisconnected(); }
+    }
+
+    async function fetchHealth() {
+        try {
+            const res = await fetch(BASE + '/health');
+            const data = await res.json();
+            setBadge($('health-redis'),  data.redis_status);
+            setBadge($('health-api'),    data.api_status);
+            setBadge($('health-worker'), data.worker_status);
+            setBadge($('health-gpu'),    data.gpu_status);
+
+            // Worker panel
+            $('worker-status').textContent = data.worker_status || '—';
+            const [wc] = statusColor(data.worker_status);
+            $('worker-status').className = 'text-sm font-semibold ' + statusColor(data.worker_status)[1];
+
+            $('worker-uptime').textContent = data.uptime_seconds ? fmtUptime(data.uptime_seconds) : '—';
+        } catch { setDisconnected(); }
+    }
+
+    async function fetchGPU() {
+        try {
+            const res = await fetch(BASE + '/gpu');
+            const data = await res.json();
+            const panel = $('gpu-panel');
+            if (!data.available) {
+                panel.innerHTML = '<p class="text-gray-500 italic">No GPU detected</p>';
+                return;
+            }
+            let html = '';
+            for (const gpu of data.gpus) {
+                const memPct = gpu.memory_total_mb > 0
+                    ? Math.round((gpu.memory_used_mb / gpu.memory_total_mb) * 100)
+                    : 0;
+                html += `
+                <div class="mb-4 last:mb-0">
+                    <p class="text-xs text-gray-500 mb-2">GPU ${gpu.index} — ${gpu.name}</p>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <p class="text-xs text-gray-500">Memory</p>
+                            <p class="text-sm font-semibold text-white">${Math.round(gpu.memory_used_mb)} / ${Math.round(gpu.memory_total_mb)} MB</p>
+                            <div class="mt-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
+                                <div class="h-full rounded-full bg-gradient-to-r from-accent to-purple-500 transition-all duration-500" style="width:${memPct}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Utilization</p>
+                            <p class="text-sm font-semibold text-white">${gpu.gpu_util_pct}%</p>
+                            <div class="mt-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
+                                <div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500" style="width:${gpu.gpu_util_pct}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Temperature</p>
+                            <p class="text-sm font-semibold ${gpu.temperature_c > 80 ? 'text-rose-400' : gpu.temperature_c > 60 ? 'text-amber-400' : 'text-emerald-400'}">${gpu.temperature_c}°C</p>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            panel.innerHTML = html;
+        } catch { $('gpu-panel').innerHTML = '<p class="text-rose-400 text-sm">Could not load GPU stats</p>'; }
+    }
+
+    async function fetchJobs() {
+        try {
+            const res = await fetch(BASE + '/api/jobs?limit=50');
+            const data = await res.json();
+            const tbody = $('jobs-tbody');
+
+            if (!data.jobs || data.jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-500">No jobs yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.jobs.map(j => {
+                const [bg, fg] = statusColor(j.status);
+                return `<tr class="hover:bg-surface-hover transition-colors duration-150">
+                    <td class="py-3 pr-4 font-mono text-xs text-gray-300">${j.job_id?.substring(0, 8) ?? '—'}…</td>
+                    <td class="py-3 pr-4"><span class="status-badge ${bg} ${fg}">${j.status ?? '—'}</span></td>
+                    <td class="py-3 pr-4 text-xs text-gray-400">${fmtTimestamp(j.created)}</td>
+                    <td class="py-3 pr-4 text-xs text-gray-400">${fmtTimestamp(j.updated)}</td>
+                    <td class="py-3 text-xs text-gray-500 truncate max-w-[200px]">${j.error ?? '—'}</td>
+                </tr>`;
+            }).join('');
+
+            // Also update worker processed count from metrics if available
+            try {
+                const mRes = await fetch(BASE + '/metrics');
+                const mText = await mRes.text();
+                const processed = mText.match(/shortz_worker_jobs_processed\s+([\d.]+)/);
+                const avgTime   = mText.match(/shortz_worker_avg_job_time_seconds\s+([\d.]+)/);
+                if (processed) $('worker-processed').textContent = processed[1];
+                if (avgTime)   $('worker-avg').textContent = parseFloat(avgTime[1]).toFixed(1) + 's';
+            } catch {}
+
+        } catch { $('jobs-tbody').innerHTML = '<tr><td colspan="5" class="py-8 text-center text-rose-400">Error loading jobs</td></tr>'; }
+    }
+
+    function setDisconnected() {
+        const el = $('connection-status');
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-soft pulse-dot"></span> Disconnected';
+        el.className = 'flex items-center gap-1.5 text-xs text-rose-soft';
+    }
+
+    // ---- Polling loop ----
+    async function refresh() {
+        await Promise.all([fetchQueue(), fetchHealth(), fetchGPU(), fetchJobs()]);
+        $('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
+        const el = $('connection-status');
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-soft pulse-dot"></span> Connected';
+        el.className = 'flex items-center gap-1.5 text-xs text-emerald-soft';
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+    </script>
+</body>
+</html>

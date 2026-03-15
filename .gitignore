@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Project runtime artifacts
+output/
+logs/runtime/
+logs/history/
+progress.txt
+*.log
+
+# Test environment
+test_env/
+
+# Docker
+.docker/
+
+# Compiled bytecode
+*.pyc
