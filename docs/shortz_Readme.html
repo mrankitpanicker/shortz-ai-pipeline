@@ -1,0 +1,2617 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shortz — AI Video Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DESIGN TOKENS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+:root {
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body:    'Geist', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', 'Courier New', monospace;
+
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+
+  /* Accent palette — same both modes */
+  --amber:      #e8a640;
+  --amber-dim:  rgba(232,166,64,0.15);
+  --amber-mid:  rgba(232,166,64,0.35);
+  --teal:       #3eb8a0;
+  --teal-dim:   rgba(62,184,160,0.12);
+  --teal-mid:   rgba(62,184,160,0.3);
+  --violet:     #8b74d8;
+  --violet-dim: rgba(139,116,216,0.12);
+  --rose:       #d46e7a;
+  --rose-dim:   rgba(212,110,122,0.12);
+  --rose-mid:   rgba(212,110,122,0.35);
+  --sky:        #5ba4cf;
+  --sky-dim:    rgba(91,164,207,0.12);
+  --sky-mid:    rgba(91,164,207,0.30);
+
+  --green:      #4aba7a;
+  --red:        #d45a5a;
+}
+
+[data-theme="dark"] {
+  --bg-base:    #0b0c0f;
+  --bg-raised:  #111318;
+  --bg-surface: #181b21;
+  --bg-overlay: #1f2228;
+  --bg-hover:   #242830;
+
+  --line:       rgba(255,255,255,0.07);
+  --line-mid:   rgba(255,255,255,0.12);
+  --line-strong:rgba(255,255,255,0.20);
+
+  --text-primary:   #edeef0;
+  --text-secondary: #8a8f9b;
+  --text-tertiary:  #72767f;
+  --text-disabled:  #4a4f57;
+
+  --code-bg:    #0d0e12;
+  --code-border:rgba(255,255,255,0.08);
+}
+
+[data-theme="light"] {
+  --bg-base:    #f4f2ee;
+  --bg-raised:  #edeae4;
+  --bg-surface: #e5e1d9;
+  --bg-overlay: #dcd8ce;
+  --bg-hover:   #d4d0c6;
+
+  --line:       rgba(0,0,0,0.07);
+  --line-mid:   rgba(0,0,0,0.12);
+  --line-strong:rgba(0,0,0,0.20);
+
+  --text-primary:   #16181c;
+  --text-secondary: #5a5f6b;
+  --text-tertiary:  #818691;
+  --text-disabled:  #b0b4bc;
+
+  --code-bg:    #ebe8e2;
+  --code-border:rgba(0,0,0,0.10);
+
+  /* Soften accents for light */
+  --amber:      #a86714;
+  --teal:       #1a8a74;
+  --violet:     #6650b8;
+  --rose:       #b84e5a;
+  --sky:        #2c7ab0;
+  --green:      #1e8a4a;
+  --red:        #b83a3a;
+
+  --amber-dim:  rgba(168,103,20,0.10);
+  --amber-mid:  rgba(168,103,20,0.28);
+  --teal-dim:   rgba(26,138,116,0.10);
+  --teal-mid:   rgba(26,138,116,0.25);
+  --violet-dim: rgba(102,80,184,0.10);
+  --rose-dim:   rgba(184,78,90,0.10);
+  --rose-mid:   rgba(184,78,90,0.28);
+  --sky-dim:    rgba(44,122,176,0.10);
+  --sky-mid:    rgba(44,122,176,0.28);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RESET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  transition: background 0.35s, color 0.35s;
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-mid); border-radius: 3px; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TYPOGRAPHY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.t-display {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 7vw, 82px);
+  letter-spacing: -1.5px;
+  line-height: 1.03;
+  color: var(--text-primary);
+}
+.t-display em { font-style: italic; color: var(--text-secondary); }
+
+.t-title   { font-size: 22px; font-weight: 500; letter-spacing: -0.3px; color: var(--text-primary); }
+.t-heading { font-size: 17px; font-weight: 500; color: var(--text-primary); }
+.t-label   { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); }
+.t-body    { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+.t-small   { font-size: 12px; color: var(--text-tertiary); }
+.t-mono    { font-family: var(--font-mono); font-size: 12px; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.wrap      { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+.wrap-sm   { max-width: 740px;  margin: 0 auto; padding: 0 32px; }
+.section   { padding: 96px 0; border-top: 1px solid var(--line); }
+.section:first-of-type { border-top: none; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   NAV
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+  height: 54px;
+  display: flex; align-items: center;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--line);
+  transition: background 0.35s, border-color 0.35s;
+}
+.nav-inner {
+  max-width: 1080px; margin: 0 auto; width: 100%; padding: 0 32px;
+  display: flex; align-items: center; gap: 0;
+}
+.nav-logo {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+  color: var(--text-primary); letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 8px; margin-right: 32px;
+}
+.nav-logo-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--amber); flex-shrink: 0;
+  animation: breathe 3s ease-in-out infinite;
+}
+@keyframes breathe { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.nav-links { display: flex; gap: 0; flex: 1; }
+.nav-link {
+  font-size: 12px; color: var(--text-tertiary);
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
+  font-family: var(--font-mono);
+}
+.nav-link:hover    { color: var(--text-primary); background: var(--bg-hover); }
+.nav-link.active   { color: var(--text-primary); }
+
+.nav-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+/* Theme toggle */
+.theme-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--line-mid);
+  background: var(--bg-raised);
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+.theme-btn:hover { color: var(--text-primary); border-color: var(--line-strong); }
+.theme-pill {
+  width: 28px; height: 16px; border-radius: 8px;
+  background: var(--bg-surface); border: 1px solid var(--line-mid);
+  position: relative; transition: background 0.3s;
+}
+.theme-pill-thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: transform 0.25s, background 0.25s;
+}
+[data-theme="light"] .theme-pill { background: var(--amber-dim); border-color: var(--amber-mid); }
+[data-theme="light"] .theme-pill-thumb { transform: translateX(12px); background: var(--amber); }
+
+/* Status pill */
+.status-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 99px;
+  background: var(--teal-dim); border: 1px solid var(--teal-mid);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  color: var(--teal); letter-spacing: 0.05em;
+}
+.status-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--teal); animation: breathe 2s ease-in-out infinite;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HERO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#hero {
+  min-height: 100vh; display: flex; flex-direction: column;
+  justify-content: center; padding: 120px 0 80px;
+  position: relative; overflow: hidden;
+}
+
+/* Subtle grid */
+.hero-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 75%);
+}
+
+/* Glow orbs */
+.hero-glow {
+  position: absolute; pointer-events: none;
+  border-radius: 50%; filter: blur(100px);
+  will-change: transform;
+  contain: strict;
+}
+.glow-a {
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, var(--amber-dim), transparent 65%);
+  top: 10%; left: -10%; animation: drift 12s ease-in-out infinite;
+}
+.glow-b {
+  width: 500px; height: 400px;
+  background: radial-gradient(ellipse, var(--teal-dim), transparent 65%);
+  top: 30%; right: -5%; animation: drift 16s ease-in-out infinite reverse;
+}
+@keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-30px)} }
+
+.hero-content { position: relative; z-index: 1; }
+
+/* Eyebrow */
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 14px; border-radius: 99px;
+  border: 1px solid var(--line-mid);
+  background: var(--bg-raised);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  color: var(--text-tertiary); margin-bottom: 32px;
+  opacity: 0; animation: fadeUp 0.6s ease forwards 0.1s;
+}
+.hero-eyebrow-accent { color: var(--amber); }
+
+.hero-title-wrap {
+  margin-bottom: 28px;
+  opacity: 0; animation: fadeUp 0.7s ease forwards 0.25s;
+}
+
+.hero-sub {
+  max-width: 520px; margin-bottom: 40px;
+  font-size: 17px; color: var(--text-secondary); line-height: 1.65;
+  font-weight: 300;
+  opacity: 0; animation: fadeUp 0.7s ease forwards 0.4s;
+}
+
+/* Key facts row */
+.hero-facts {
+  display: flex; gap: 0; flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 40px;
+  background: var(--bg-raised);
+  opacity: 0; animation: fadeUp 0.7s ease forwards 0.55s;
+}
+.hero-fact {
+  flex: 1; min-width: 140px;
+  padding: 18px 20px;
+  border-right: 1px solid var(--line);
+}
+.hero-fact:last-child { border-right: none; }
+.hf-val {
+  font-family: var(--font-display);
+  font-size: 26px; color: var(--text-primary);
+  margin-bottom: 2px; line-height: 1;
+}
+.hf-lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); }
+
+/* CTA row */
+.hero-cta {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  opacity: 0; animation: fadeUp 0.7s ease forwards 0.7s;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 22px; border-radius: var(--radius-md);
+  background: var(--text-primary); color: var(--bg-base);
+  font-size: 13px; font-weight: 500;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 22px; border-radius: var(--radius-md);
+  border: 1px solid var(--line-mid);
+  background: var(--bg-raised);
+  font-size: 13px; color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.btn-secondary:hover { border-color: var(--line-strong); color: var(--text-primary); transform: translateY(-1px); }
+
+/* Pipeline strip */
+.hero-pipeline {
+  margin-top: 64px;
+  opacity: 0; animation: fadeUp 0.8s ease forwards 0.85s;
+}
+.pipeline-strip {
+  display: flex; align-items: center;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-xl); padding: 16px 24px;
+  gap: 0; overflow-x: auto;
+}
+.ps-stage {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px 16px; border-radius: var(--radius-md);
+  cursor: pointer; transition: background 0.15s; flex-shrink: 0;
+}
+.ps-stage:hover { background: var(--bg-hover); }
+.ps-icon { font-size: 18px; }
+.ps-name { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-primary); }
+.ps-sub  { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); }
+.ps-sep  { flex: 1; min-width: 16px; display: flex; align-items: center; justify-content: center; }
+.ps-arrow {
+  width: 100%; height: 1px; background: var(--line-mid); position: relative; flex: 1; min-width: 20px;
+  overflow: hidden;
+}
+.ps-arrow-dot {
+  position: absolute; top: 50%; left: 0;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--amber);
+  transform: translate(-4px, -50%);
+  animation: slideDot 3s linear infinite;
+}
+.ps-arrow-dot.d2 { animation-delay: -1s; }
+.ps-arrow-dot.d3 { animation-delay: -2s; }
+@keyframes slideDot { from{transform:translate(-4px,-50%);opacity:0} 10%{opacity:1} 90%{opacity:1} to{transform:translate(calc(100% + 4px),-50%);opacity:0} }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SECTION HEADER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.sec-header { margin-bottom: 48px; }
+.sec-eyebrow { margin-bottom: 10px; }
+.sec-eyebrow-text {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-tertiary); display: flex; align-items: center; gap: 8px;
+}
+.sec-eyebrow-text::before {
+  content:''; width: 20px; height: 1px; background: var(--line-strong);
+}
+.sec-title { font-family: var(--font-display); font-size: clamp(28px,4vw,40px); letter-spacing: -0.5px; color: var(--text-primary); margin-bottom: 10px; }
+.sec-body  { font-size: 15px; color: var(--text-secondary); max-width: 560px; line-height: 1.7; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   OUTPUT PROOF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.output-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media(max-width:640px){ .output-grid { grid-template-columns: 1fr; } }
+
+.output-card {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.output-card:hover { border-color: var(--line-mid); transform: translateY(-2px); }
+
+.output-preview {
+  height: 200px; background: var(--bg-surface);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+.output-video-mock {
+  width: 90px; height: 160px; border-radius: 10px;
+  background: var(--bg-overlay); border: 1px solid var(--line-mid);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  position: relative;
+}
+.video-play {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--amber); display: flex; align-items: center; justify-content: center;
+  color: var(--bg-base); font-size: 12px;
+}
+.video-sub-line {
+  width: 60px; height: 4px; background: var(--amber-mid); border-radius: 2px;
+  animation: subPulse 1.5s ease-in-out infinite;
+}
+.video-sub-line:nth-child(3) { width: 44px; animation-delay: 0.2s; }
+@keyframes subPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+.output-stat-bar {
+  position: absolute; bottom: 12px; left: 12px; right: 12px;
+  height: 3px; background: var(--line);
+  border-radius: 2px; overflow: hidden;
+}
+.output-stat-fill {
+  height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber));
+  transform-origin: left center;
+  animation: fillProgress 3s ease-in-out infinite;
+}
+@keyframes fillProgress {
+  0%   { transform: scaleX(0); }
+  70%  { transform: scaleX(1); }
+  100% { transform: scaleX(1); }
+}
+
+.output-info { padding: 16px 18px; }
+.output-title { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; }
+.output-meta  { display: flex; gap: 12px; }
+.output-tag   {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  color: var(--text-tertiary); background: var(--bg-surface);
+  padding: 2px 7px; border-radius: var(--radius-sm);
+}
+
+.output-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 16px; }
+.output-stat-card {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-md); padding: 16px;
+}
+.osc-val { font-family: var(--font-display); font-size: 28px; margin-bottom: 2px; }
+.osc-lbl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-tertiary); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   QUICK START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.qs-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+.qs-tab {
+  padding: 7px 16px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  color: var(--text-tertiary); border: 1px solid transparent;
+  transition: all 0.15s; letter-spacing: 0.04em;
+}
+.qs-tab:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.qs-tab.active {
+  color: var(--text-primary); background: var(--bg-surface);
+  border-color: var(--line-mid);
+}
+.qs-pane { display: none; }
+.qs-pane.active { display: block; }
+
+.qs-steps { display: flex; flex-direction: column; gap: 0; }
+.qs-step  { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.qs-step:last-child { border-bottom: none; }
+
+.qs-num {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: 50%; border: 1px solid var(--line-mid);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);
+  margin-top: 2px;
+}
+.qs-body { flex: 1; }
+.qs-title { font-size: 14px; font-weight: 500; margin-bottom: 10px; }
+
+/* Code block */
+.code-block {
+  background: var(--code-bg); border: 1px solid var(--code-border);
+  border-radius: var(--radius-md); overflow: hidden;
+}
+.code-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; border-bottom: 1px solid var(--code-border);
+}
+.code-lang { font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); letter-spacing: 0.08em; text-transform: uppercase; }
+.copy-btn {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-tertiary); padding: 3px 9px;
+  border: 1px solid var(--line-mid); border-radius: var(--radius-sm);
+  background: transparent; transition: all 0.15s; letter-spacing: 0.04em;
+}
+.copy-btn:hover     { color: var(--text-primary); border-color: var(--line-strong); }
+.copy-btn.copied    { color: var(--teal); border-color: var(--teal-mid); }
+code, pre {
+  font-family: var(--font-mono); font-size: 12.5px;
+  line-height: 1.9; color: var(--text-secondary);
+}
+pre { padding: 16px; overflow-x: auto; }
+.syn-cmd    { color: var(--teal); }
+.syn-flag   { color: var(--sky); }
+.syn-val    { color: var(--amber); }
+.syn-cmt    { color: var(--text-tertiary); font-style: italic; }
+.syn-key    { color: var(--violet); }
+.syn-str    { color: var(--amber); }
+.syn-num    { color: var(--rose); }
+.syn-kw     { color: var(--teal); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   INTERACTIVE PIPELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.pipeline-container { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+@media(max-width:760px){ .pipeline-container { grid-template-columns:1fr; } }
+
+.pipeline-stages { display: flex; flex-direction: column; gap: 4px; }
+.pipeline-stage {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border-radius: var(--radius-md);
+  border: 1px solid transparent; cursor: pointer;
+  transition: all 0.15s; position: relative;
+}
+.pipeline-stage::before {
+  content: ''; position: absolute; left: -1px; top: 20%; bottom: 20%;
+  width: 2px; border-radius: 1px; background: transparent;
+  transition: background 0.2s;
+}
+.pipeline-stage:hover { background: var(--bg-hover); border-color: var(--line); }
+.pipeline-stage.active {
+  background: var(--bg-surface); border-color: var(--line-mid);
+}
+.pipeline-stage.active::before { background: var(--amber); }
+
+.ps-stage-icon {
+  width: 32px; height: 32px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; background: var(--bg-overlay); flex-shrink: 0;
+}
+.ps-stage-text { flex: 1; min-width: 0; }
+.ps-stage-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.ps-stage-tech { font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
+.ps-stage-vram {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  padding: 2px 7px; border-radius: var(--radius-sm); flex-shrink: 0;
+}
+.vram-none   { background: var(--bg-overlay); color: var(--text-tertiary); }
+.vram-low    { background: var(--teal-dim); color: var(--teal); }
+.vram-med    { background: var(--amber-dim); color: var(--amber); }
+.vram-high   { background: var(--rose-dim); color: var(--rose); }
+
+/* Stage connector */
+.stage-connector {
+  display: flex; justify-content: center; padding: 2px 0;
+}
+.stage-connector-line {
+  width: 1px; height: 16px; background: var(--line-mid); margin-left: 27px;
+}
+
+/* Detail panel */
+.pipeline-detail {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 28px;
+  min-height: 420px; display: flex; flex-direction: column;
+}
+.pd-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  color: var(--text-tertiary);
+}
+.pd-empty-icon { font-size: 28px; opacity: .4; }
+.pd-empty-text { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; }
+
+.pd-content { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+.pd-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.pd-title  { font-family: var(--font-display); font-size: 22px; color: var(--text-primary); }
+.pd-vram-big {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 4px 10px; border-radius: var(--radius-sm);
+  flex-shrink: 0; margin-top: 4px;
+}
+.pd-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.75; }
+
+/* VRAM bar */
+.pd-vram-section { }
+.pd-vram-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.pd-vram-track {
+  height: 6px; background: var(--bg-surface); border-radius: 3px; overflow: hidden;
+  border: 1px solid var(--line);
+}
+.pd-vram-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.5s cubic-bezier(.4,0,.2,1);
+}
+
+/* Details list */
+.pd-details { display: flex; flex-direction: column; gap: 8px; }
+.pd-detail-row {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 10px 14px; background: var(--bg-surface);
+  border-radius: var(--radius-sm); border: 1px solid var(--line);
+}
+.pd-detail-key   { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); min-width: 80px; margin-top: 1px; }
+.pd-detail-value { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.arch-svg-wrap {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 32px;
+  overflow: hidden;
+}
+.arch-node-group { cursor: pointer; }
+.arch-node-group:hover .arch-box { stroke-width: 1.5; }
+.arch-box    { transition: fill 0.15s, stroke 0.15s; }
+.arch-label  { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.arch-sub    { font-family: var(--font-mono); font-size: 9px; }
+.arch-conn   { stroke-dasharray: 4 3; animation: dashFlow 8s linear infinite; }
+.arch-conn-solid { }
+@keyframes dashFlow { to { stroke-dashoffset: -140; } }
+
+/* Arch legend */
+.arch-legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+.arch-legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+.arch-legend-dot  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DATA FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.flow-diagram {
+  display: flex; flex-direction: column; gap: 0;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.flow-row {
+  display: flex; align-items: stretch;
+  border-bottom: 1px solid var(--line);
+}
+.flow-row:last-child { border-bottom: none; }
+.flow-actor {
+  width: 120px; flex-shrink: 0;
+  padding: 14px 16px; display: flex; align-items: center;
+  border-right: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--text-tertiary); letter-spacing: 0.06em;
+}
+.flow-step {
+  flex: 1; padding: 14px 20px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.flow-badge {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: var(--radius-sm);
+  letter-spacing: 0.06em; flex-shrink: 0; text-transform: uppercase;
+}
+.fb-queue  { background: var(--amber-dim); color: var(--amber); }
+.fb-gpu    { background: var(--rose-dim); color: var(--rose); }
+.fb-redis  { background: var(--violet-dim); color: var(--violet); }
+.fb-api    { background: var(--sky-dim); color: var(--sky); }
+.fb-cpu    { background: var(--teal-dim); color: var(--teal); }
+.flow-mono { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-left: auto; flex-shrink: 0; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   OBSERVABILITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.obs-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media(max-width:700px){ .obs-grid{grid-template-columns:1fr;} }
+
+.obs-card {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 20px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.obs-card:hover { border-color: var(--line-mid); }
+.obs-card-label { margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.obs-card-icon  { font-size: 16px; }
+.obs-card-title { font-size: 13px; font-weight: 500; }
+
+.metric-list { display: flex; flex-direction: column; gap: 6px; }
+.metric-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; background: var(--bg-surface);
+  border-radius: var(--radius-sm); font-size: 12px;
+}
+.metric-name  { font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); flex: 1; }
+.metric-val   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-primary); }
+.metric-type  { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); padding: 1px 5px; background: var(--bg-overlay); border-radius: 3px; }
+
+.endpoint-list { display: flex; flex-direction: column; gap: 5px; }
+.endpoint-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background 0.12s; font-size: 12px;
+}
+.endpoint-row:hover { background: var(--bg-hover); }
+.ep-method {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  padding: 2px 6px; border-radius: 3px; min-width: 36px; text-align: center;
+  letter-spacing: 0.04em;
+}
+.ep-get  { background: var(--teal-dim); color: var(--teal); }
+.ep-post { background: var(--amber-dim); color: var(--amber); }
+.ep-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); flex: 1; }
+.ep-desc { font-size: 11px; color: var(--text-tertiary); }
+
+/* Grafana mock */
+.grafana-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gf-panel {
+  background: var(--bg-surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.gf-panel-title { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px; }
+.gf-panel-val   { font-family: var(--font-display); font-size: 22px; line-height: 1; }
+.gf-sparkline   {
+  height: 28px; margin-top: 6px;
+  background: linear-gradient(to top, var(--teal-dim), transparent);
+  border-radius: 2px; position: relative; overflow: hidden;
+}
+.gf-sparkline::after {
+  content:''; position:absolute; bottom:0; left:0; right:0;
+  height: 1px; background: var(--teal-mid);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   GPU LIFECYCLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.gpu-timeline {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 28px; overflow: hidden;
+}
+.gpu-tl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.gpu-tl-title  { font-size: 13px; font-weight: 500; }
+.gpu-tl-legend { display: flex; gap: 16px; }
+.gtl-item { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); }
+.gtl-swatch { width: 20px; height: 6px; border-radius: 3px; }
+
+/* Timeline rows */
+.gpu-tl-rows { display: flex; flex-direction: column; gap: 12px; }
+.gpu-tl-row  { display: flex; align-items: center; gap: 14px; }
+.gpu-tl-label { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); width: 80px; flex-shrink: 0; text-align: right; }
+.gpu-tl-track { flex: 1; height: 28px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--line); position: relative; overflow: hidden; }
+
+.gpu-tl-bar {
+  position: absolute; top: 4px; bottom: 4px;
+  border-radius: 4px; display: flex; align-items: center;
+  padding: 0 8px; font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.06em; white-space: nowrap; overflow: hidden;
+  transition: opacity 0.3s;
+}
+.bar-xtts  { background: var(--rose-dim); border: 1px solid var(--rose-mid); color: var(--rose); }
+.bar-whisp { background: var(--teal-dim); border: 1px solid var(--teal-mid); color: var(--teal); }
+.bar-ffmpeg{ background: var(--sky-dim);  border: 1px solid var(--sky-mid);  color: var(--sky); }
+.bar-idle  { background: var(--bg-overlay); border: 1px solid var(--line); color: var(--text-tertiary); }
+.bar-active {
+  position: relative; overflow: hidden;
+}
+.bar-active::after {
+  content:''; position:absolute; top:0; left:0; width:50%;
+  height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);
+  animation: shimmer 2s linear infinite;
+  transform: translateX(-200%);
+}
+@keyframes shimmer { to{ transform: translateX(400%); } }
+
+.gpu-tl-time { display: flex; justify-content: flex-end; }
+.gpu-tl-tick-row {
+  flex: 1; display: flex; justify-content: space-between; margin-left: 94px;
+  padding: 0 0; margin-top: 6px;
+}
+.gpu-tl-tick { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); }
+
+/* VRAM capacity indicator */
+.gpu-capacity-wrap { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.gpu-capacity-label { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.gpu-capacity-track {
+  height: 8px; background: var(--bg-surface); border-radius: 4px;
+  border: 1px solid var(--line); overflow: hidden; position: relative;
+}
+.gpu-cap-segment {
+  position: absolute; top: 1px; bottom: 1px;
+  border-radius: 3px;
+}
+.seg-xtts  { left: 0; background: var(--rose-dim); border: 1px solid var(--rose); }
+.seg-whisp { background: var(--teal-dim); border: 1px solid var(--teal); }
+.seg-free  { background: var(--bg-overlay); border: none; }
+.gpu-cap-legend { display: flex; gap: 14px; margin-top: 8px; }
+.gcl-item { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); }
+.gcl-dot  { width: 8px; height: 8px; border-radius: 2px; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CONSTRAINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.constraints-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media(max-width:640px){ .constraints-grid { grid-template-columns:1fr; } }
+
+.constraint-card {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 20px; position: relative;
+  overflow: hidden;
+}
+.constraint-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+}
+.cc-tradeoff::before { background: linear-gradient(90deg, var(--amber), transparent); }
+.cc-limit::before    { background: linear-gradient(90deg, var(--rose), transparent); }
+.cc-design::before   { background: linear-gradient(90deg, var(--teal), transparent); }
+.cc-scale::before    { background: linear-gradient(90deg, var(--violet), transparent); }
+
+.cc-icon  { font-size: 20px; margin-bottom: 10px; display: block; }
+.cc-title { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.cc-body  { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.cc-tag   {
+  display: inline-block; margin-top: 10px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--radius-sm); letter-spacing: 0.06em;
+}
+.ct-amber  { background: var(--amber-dim); color: var(--amber); }
+.ct-rose   { background: var(--rose-dim); color: var(--rose); }
+.ct-teal   { background: var(--teal-dim); color: var(--teal); }
+.ct-violet { background: var(--violet-dim); color: var(--violet); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DEEP DIVE (COLLAPSIBLE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.deep-dive { display: flex; flex-direction: column; gap: 4px; }
+
+.dd-item {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-md); overflow: hidden;
+  transition: border-color 0.15s;
+}
+.dd-item:hover      { border-color: var(--line-mid); }
+.dd-item.open       { border-color: var(--line-mid); }
+
+.dd-trigger {
+  width: 100%; display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px; text-align: left; background: none;
+  transition: background 0.12s;
+}
+.dd-trigger:hover   { background: var(--bg-hover); }
+.dd-num   { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); min-width: 24px; }
+.dd-title { font-size: 14px; font-weight: 500; flex: 1; transition: color 0.15s; }
+.dd-arrow {
+  font-size: 12px; color: var(--text-tertiary);
+  transition: transform 0.25s; margin-left: auto;
+}
+.dd-item.open .dd-arrow { transform: rotate(90deg); }
+
+.dd-body {
+  display: none; padding: 0 20px 20px; border-top: 1px solid var(--line);
+}
+.dd-item.open .dd-body { display: block; padding-top: 20px; }
+
+/* Tables within deep dive */
+.dd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dd-table th {
+  text-align: left; padding: 8px 12px;
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-tertiary); border-bottom: 1px solid var(--line-mid);
+}
+.dd-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.dd-table tr:last-child td { border-bottom: none; }
+.dd-table tr:hover td { background: var(--bg-hover); }
+
+/* Thread tree */
+.thread-tree { display: flex; flex-direction: column; gap: 6px; }
+.tt-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; background: var(--bg-surface);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.tt-name    { font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); flex: 1; }
+.tt-purpose { font-size: 12px; color: var(--text-secondary); flex: 1.5; }
+.tt-signal  { font-family: var(--font-mono); font-size: 10px; color: var(--violet); background: var(--violet-dim); padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+
+/* Startup sequence */
+.startup-seq { display: flex; flex-direction: column; }
+.ss-item {
+  display: flex; gap: 14px;
+  padding: 12px 0 12px 0; border-bottom: 1px solid var(--line);
+}
+.ss-item:last-child { border-bottom: none; }
+.ss-n {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  background: var(--bg-surface); border: 1px solid var(--line-mid);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);
+  margin-top: 1px;
+}
+.ss-n.done { background: var(--teal-dim); border-color: var(--teal-mid); color: var(--teal); }
+.ss-body   { flex: 1; }
+.ss-title  { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.ss-detail { font-size: 12px; color: var(--text-secondary); }
+
+/* Failure table */
+.failure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fgrid-item {
+  background: var(--bg-surface); border: 1px solid var(--line);
+  border-radius: var(--radius-md); padding: 14px;
+}
+.fgi-layer { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-tertiary); margin-bottom: 4px; }
+.fgi-strategy { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   FOOTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+footer {
+  border-top: 1px solid var(--line);
+  padding: 40px 0;
+}
+.footer-inner {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+}
+.footer-brand { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.footer-meta  { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+.footer-links { display: flex; gap: 16px; }
+.footer-link  { font-size: 12px; color: var(--text-tertiary); transition: color 0.15s; }
+.footer-link:hover { color: var(--text-primary); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   POLISH ADDITIONS (surgical layer)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Nav: active link gets a bottom-border accent instead of just color change */
+.nav-link.active {
+  color: var(--text-primary);
+  position: relative;
+}
+.nav-link.active::after {
+  content: '';
+  position: absolute; bottom: -14px; left: 12px; right: 12px;
+  height: 1px; background: var(--amber); border-radius: 1px;
+}
+
+/* Nav: blur on scroll (JS adds .scrolled) */
+#nav.scrolled {
+  background: var(--bg-base);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+@supports (background: color-mix(in srgb, red 50%, blue)) {
+  #nav.scrolled {
+    background: color-mix(in srgb, var(--bg-base) 88%, transparent);
+  }
+}
+
+/* Hero: value-prop clarity — bold the key phrase */
+.hero-sub strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Hero: CTA primary button — tighter focus ring */
+.btn-primary:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+/* Hero: facts row — hover lift */
+.hero-fact {
+  transition: background 0.15s;
+  cursor: default;
+}
+.hero-fact:hover {
+  background: var(--bg-hover);
+}
+.hero-fact:hover .hf-val {
+  color: var(--amber);
+  transition: color 0.15s;
+}
+
+/* Section: key takeaway callout */
+.sec-takeaway {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-secondary); line-height: 1.5;
+  background: var(--bg-surface);
+  border: 1px solid var(--line-mid);
+  border-left: 2px solid var(--amber);
+  padding: 7px 12px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin-bottom: 40px;
+}
+.sec-takeaway-icon { color: var(--amber); font-style: normal; flex-shrink: 0; }
+
+/* Section header: tighten body line-height slightly */
+.sec-body { line-height: 1.65; }
+
+/* Data flow rows: hover highlight */
+.flow-row { transition: background 0.12s; cursor: default; }
+.flow-row:hover { background: var(--bg-hover); }
+
+/* Constraint cards: hover lift is already there — add border accent on hover */
+.constraint-card { transition: border-color 0.2s, transform 0.15s; }
+.constraint-card:hover {
+  border-color: var(--line-mid);
+  transform: translateY(-1px);
+}
+
+/* Deep dive: improve trigger hover */
+.dd-trigger:hover .dd-title { color: var(--amber); }
+
+/* Pipeline stages: tighter focus style */
+.pipeline-stage:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* Endpoint rows: active selected state */
+.endpoint-row.ep-active {
+  background: var(--bg-hover);
+  border-left: 2px solid var(--teal);
+  padding-left: 6px;
+  transition: all 0.15s;
+}
+
+/* Code blocks: slightly larger line-height for readability */
+pre { line-height: 2; }
+
+/* Copy button: tighter transition */
+.copy-btn { transition: color 0.12s, border-color 0.12s; }
+
+/* QS step titles: slightly stronger */
+.qs-title { color: var(--text-primary); font-weight: 500; }
+
+/* Arch legend: hover item */
+.arch-legend-item { transition: opacity 0.15s; cursor: default; }
+.arch-legend-item:hover { opacity: 1 !important; }
+
+/* Observability cards: subtle hover */
+.obs-card:hover { transform: translateY(-1px); }
+
+/* GPU timeline rows: hover */
+.gpu-tl-row { transition: background 0.12s; border-radius: var(--radius-sm); padding: 2px 4px; }
+.gpu-tl-row:hover { background: var(--bg-hover); }
+
+/* Output stats: hover */
+.output-stat-card { transition: border-color 0.15s, transform 0.15s; }
+.output-stat-card:hover { border-color: var(--line-mid); transform: translateY(-1px); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   GITHUB FAB (floating action button)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.gh-fab {
+  position: fixed; bottom: 28px; right: 28px; z-index: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.gh-fab-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-mid);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  position: relative;
+  text-decoration: none;
+}
+.gh-fab-btn:hover {
+  border-color: var(--line-strong);
+  background: var(--bg-overlay);
+  transform: scale(1.06);
+}
+.gh-fab-btn svg {
+  width: 20px; height: 20px;
+  fill: var(--text-secondary);
+  transition: fill 0.15s;
+}
+.gh-fab-btn:hover svg { fill: var(--text-primary); }
+
+.gh-fab-tooltip {
+  position: absolute; bottom: calc(100% + 10px); right: 0;
+  white-space: nowrap;
+  background: var(--bg-overlay);
+  border: 1px solid var(--line-mid);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-primary);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.gh-fab-tooltip::after {
+  content: '';
+  position: absolute; top: 100%; right: 14px;
+  border: 5px solid transparent;
+  border-top-color: var(--line-mid);
+}
+.gh-fab-tooltip::before {
+  content: '';
+  position: absolute; top: 100%; right: 15px;
+  border: 4px solid transparent;
+  border-top-color: var(--bg-overlay);
+  z-index: 1;
+}
+.gh-fab-btn:hover .gh-fab-tooltip,
+.gh-fab-btn:focus-visible .gh-fab-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   REVEAL ANIMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.reveal {
+  opacity: 0; transform: translateY(18px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DIVIDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.divider { height: 1px; background: var(--line); margin: 28px 0; }
+
+/* Inline badge */
+.badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+}
+.badge-amber  { background: var(--amber-dim); color: var(--amber); }
+.badge-teal   { background: var(--teal-dim); color: var(--teal); }
+.badge-violet { background: var(--violet-dim); color: var(--violet); }
+.badge-rose   { background: var(--rose-dim); color: var(--rose); }
+.badge-sky    { background: var(--sky-dim); color: var(--sky); }
+
+</style>
+</head>
+<body>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     NAV
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<nav id="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <div class="nav-logo-dot"></div>
+      SHORTZ
+    </div>
+    <div class="nav-links">
+      <a href="#hero"        class="nav-link" data-sec="hero">Overview</a>
+      <a href="#pipeline"    class="nav-link" data-sec="pipeline">Pipeline</a>
+      <a href="#architecture"class="nav-link" data-sec="architecture">Arch</a>
+      <a href="#observability"class="nav-link"data-sec="observability">Observability</a>
+      <a href="#gpu"         class="nav-link" data-sec="gpu">GPU</a>
+      <a href="#constraints" class="nav-link" data-sec="constraints">Constraints</a>
+      <a href="#deepdive"    class="nav-link" data-sec="deepdive">Deep Dive</a>
+    </div>
+    <div class="nav-right">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span>v1.0 · RTX 3050</span>
+      </div>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">
+        <div class="theme-pill"><div class="theme-pill-thumb"></div></div>
+        <span id="theme-label">Light</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     HERO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section id="hero" style="padding-top:54px">
+  <div class="hero-grid"></div>
+  <div class="hero-glow glow-a"></div>
+  <div class="hero-glow glow-b"></div>
+  <div class="wrap">
+    <div class="hero-content">
+      <div class="hero-eyebrow">
+        <span class="hero-eyebrow-accent">⬡</span>
+        <span>Local AI · GPU-constrained · Production-grade</span>
+      </div>
+
+      <div class="hero-title-wrap">
+        <div class="t-display">
+          Script to <em>video</em><br>in one command.
+        </div>
+      </div>
+
+      <p class="hero-sub">
+        A Redis-backed AI video pipeline that runs <strong>entirely on local GPU</strong>. Text goes in — MP4 comes out. Optimised for <strong>4 GB VRAM</strong> through sequential model loading.
+      </p>
+
+      <div class="hero-facts">
+        <div class="hero-fact">
+          <div class="hf-val">5</div>
+          <div class="hf-lbl">Pipeline stages</div>
+        </div>
+        <div class="hero-fact">
+          <div class="hf-val">4 GB</div>
+          <div class="hf-lbl">Min VRAM</div>
+        </div>
+        <div class="hero-fact">
+          <div class="hf-val">0</div>
+          <div class="hf-lbl">Cloud APIs</div>
+        </div>
+        <div class="hero-fact">
+          <div class="hf-val">10×</div>
+          <div class="hf-lbl">Batch size</div>
+        </div>
+        <div class="hero-fact">
+          <div class="hf-val">5</div>
+          <div class="hf-lbl">Services</div>
+        </div>
+      </div>
+
+      <div class="hero-cta">
+        <a href="#quickstart" class="btn-primary" onclick="document.getElementById('quickstart').scrollIntoView({behavior:'smooth'});return false">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polygon points="2,1 11,6 2,11" fill="currentColor"/></svg>
+          Get Started
+        </a>
+        <a href="#pipeline" class="btn-secondary" onclick="document.getElementById('pipeline').scrollIntoView({behavior:'smooth'});return false">
+          Explore Pipeline
+        </a>
+        <a href="#architecture" class="btn-secondary" onclick="document.getElementById('architecture').scrollIntoView({behavior:'smooth'});return false">
+          Architecture
+        </a>
+      </div>
+
+      <div class="hero-pipeline">
+        <div class="pipeline-strip">
+          <div class="ps-stage" onclick="document.getElementById('pipeline').scrollIntoView({behavior:'smooth'})">
+            <div class="ps-icon">📝</div>
+            <div class="ps-name">TEXT</div>
+            <div class="ps-sub">input.txt</div>
+          </div>
+          <div class="ps-sep"><div class="ps-arrow"><div class="ps-arrow-dot"></div></div></div>
+          <div class="ps-stage" onclick="document.getElementById('pipeline').scrollIntoView({behavior:'smooth'})">
+            <div class="ps-icon">🎙</div>
+            <div class="ps-name">XTTS</div>
+            <div class="ps-sub">Voice Synth</div>
+          </div>
+          <div class="ps-sep"><div class="ps-arrow"><div class="ps-arrow-dot d2"></div></div></div>
+          <div class="ps-stage" onclick="document.getElementById('pipeline').scrollIntoView({behavior:'smooth'})">
+            <div class="ps-icon">🌊</div>
+            <div class="ps-name">WHISPER</div>
+            <div class="ps-sub">Alignment</div>
+          </div>
+          <div class="ps-sep"><div class="ps-arrow"><div class="ps-arrow-dot d3"></div></div></div>
+          <div class="ps-stage" onclick="document.getElementById('pipeline').scrollIntoView({behavior:'smooth'})">
+            <div class="ps-icon">💬</div>
+            <div class="ps-name">ASS</div>
+            <div class="ps-sub">Subtitles</div>
+          </div>
+          <div class="ps-sep"><div class="ps-arrow"><div class="ps-arrow-dot"></div></div></div>
+          <div class="ps-stage" onclick="document.getElementById('pipeline').scrollIntoView({behavior:'smooth'})">
+            <div class="ps-icon">🎬</div>
+            <div class="ps-name">FFMPEG</div>
+            <div class="ps-sub">Render</div>
+          </div>
+          <div class="ps-sep"><div class="ps-arrow"><div class="ps-arrow-dot d2"></div></div></div>
+          <div class="ps-stage">
+            <div class="ps-icon">📦</div>
+            <div class="ps-name">MP4</div>
+            <div class="ps-sub">1080×1920</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     OUTPUT PROOF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="output">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Output</div></div>
+    <div class="sec-title">What it produces</div>
+    <div class="sec-body">Every run produces a fully-rendered short-form video with cloned voice, word-level karaoke subtitles, and configurable background — all generated locally in minutes.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> No cloud upload. No API key. Files land in <code style="font-family:var(--font-mono);font-size:10px">output/</code> on the same machine that ran the job.</div>
+  </div>
+
+  <div class="output-grid reveal">
+    <div class="output-card">
+      <div class="output-preview">
+        <div class="output-video-mock">
+          <div class="video-play">▶</div>
+          <div class="video-sub-line"></div>
+          <div class="video-sub-line"></div>
+        </div>
+        <div class="output-stat-bar"><div class="output-stat-fill"></div></div>
+      </div>
+      <div class="output-info">
+        <div class="output-title">AI-generated short · Voice clone + karaoke subtitles</div>
+        <div class="output-meta">
+          <span class="output-tag">1080×1920</span>
+          <span class="output-tag">MP4</span>
+          <span class="output-tag">h264</span>
+          <span class="output-tag">AAC audio</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="output-card" style="flex:1">
+        <div style="padding:20px">
+          <div class="t-label" style="margin-bottom:10px">Pipeline Output Files</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div class="metric-row">
+              <div class="metric-name">voice.wav</div>
+              <span class="badge badge-rose">XTTS v2</span>
+            </div>
+            <div class="metric-row">
+              <div class="metric-name">alignment.json</div>
+              <span class="badge badge-teal">Whisper</span>
+            </div>
+            <div class="metric-row">
+              <div class="metric-name">subtitles.ass</div>
+              <span class="badge badge-amber">ASS</span>
+            </div>
+            <div class="metric-row">
+              <div class="metric-name">output.mp4</div>
+              <span class="badge badge-sky">FFmpeg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="output-stats reveal reveal-delay-1">
+    <div class="output-stat-card">
+      <div class="osc-val" style="color:var(--amber)">~90s</div>
+      <div class="osc-lbl">Avg generation time</div>
+    </div>
+    <div class="output-stat-card">
+      <div class="osc-val" style="color:var(--teal)">~3 GB</div>
+      <div class="osc-lbl">Peak VRAM used</div>
+    </div>
+    <div class="output-stat-card">
+      <div class="osc-val" style="color:var(--violet)">10</div>
+      <div class="osc-lbl">Max concurrent jobs</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     QUICK START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="quickstart">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Quick Start</div></div>
+    <div class="sec-title">Running in two minutes</div>
+    <div class="sec-body">Docker is the recommended path — it handles Redis, the GPU worker, and the API server in a single command.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> One <code style="font-family:var(--font-mono);font-size:10px">docker compose up</code> starts all five services in the correct order with health gates between each.</div>
+  </div>
+
+  <div class="reveal">
+    <div class="qs-tabs">
+      <button class="qs-tab active" onclick="switchQS('docker',this)">Docker</button>
+      <button class="qs-tab" onclick="switchQS('local',this)">Local Dev</button>
+      <button class="qs-tab" onclick="switchQS('monitoring',this)">With Monitoring</button>
+    </div>
+
+    <div class="qs-pane active" id="qs-docker">
+      <div class="qs-steps">
+        <div class="qs-step">
+          <div class="qs-num">1</div>
+          <div class="qs-body">
+            <div class="qs-title">Clone and start</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="syn-cmd">git</span> clone https://github.com/youruser/shortz.git && <span class="syn-cmd">cd</span> shortz
+<span class="syn-cmd">docker</span> compose up --build</pre>
+            </div>
+            <p style="font-size:12px;color:var(--text-tertiary);margin-top:8px">Starts Redis, API server, and GPU worker in correct order with health gates.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">2</div>
+          <div class="qs-body">
+            <div class="qs-title">Generate a video</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="syn-cmd">curl</span> <span class="syn-flag">-X POST</span> http://localhost:<span class="syn-num">8000</span>/generate \
+  <span class="syn-flag">-H</span> <span class="syn-str">"Content-Type: application/json"</span> \
+  <span class="syn-flag">-d</span> <span class="syn-str">'{"count": 1, "voice_path": "voices/uvi.wav"}'</span></pre>
+            </div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">3</div>
+          <div class="qs-body">
+            <div class="qs-title">Poll job status</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="syn-cmd">curl</span> http://localhost:<span class="syn-num">8000</span>/status/<span class="syn-val">{job_id}</span>
+<span class="syn-cmt"># → {"status":"running","stage":"voice","progress":42}</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qs-pane" id="qs-local">
+      <div class="qs-steps">
+        <div class="qs-step">
+          <div class="qs-num">1</div>
+          <div class="qs-body">
+            <div class="qs-title">Prerequisites & install</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash — prereqs: Python 3.11+, Redis 6.2+, FFmpeg, CUDA toolkit</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="syn-cmd">python</span> -m venv venv && <span class="syn-cmd">source</span> venv/bin/activate
+<span class="syn-cmd">pip</span> install -r requirements.txt</pre>
+            </div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">2</div>
+          <div class="qs-body">
+            <div class="qs-title">Start all services via supervisor</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="syn-cmd">python</span> system/shortz_supervisor_v2.py
+<span class="syn-cmt"># Launches: Redis → Worker → API → GUI → Monitor</span>
+<span class="syn-cmt"># With health gates and restart backoff</span></pre>
+            </div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">3</div>
+          <div class="qs-body">
+            <div class="qs-title">Or run services manually</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash — 4 terminals</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre>redis-server                                <span class="syn-cmt"># T1</span>
+<span class="syn-cmd">python</span> worker.py                             <span class="syn-cmt"># T2: waits for XTTS load</span>
+<span class="syn-cmd">python</span> -m uvicorn api_server:app <span class="syn-flag">--port</span> 8000  <span class="syn-cmt"># T3</span>
+<span class="syn-cmd">python</span> services/gui_main.py                  <span class="syn-cmt"># T4: production GUI</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qs-pane" id="qs-monitoring">
+      <div class="qs-steps">
+        <div class="qs-step">
+          <div class="qs-num">1</div>
+          <div class="qs-body">
+            <div class="qs-title">Start full observability stack</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="syn-cmd">docker</span> compose \
+  <span class="syn-flag">-f</span> docker-compose.yml \
+  <span class="syn-flag">-f</span> docker/docker-compose.monitoring.yml \
+  up <span class="syn-flag">-d</span></pre>
+            </div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">2</div>
+          <div class="qs-body">
+            <div class="qs-title">Access dashboards</div>
+            <div class="code-block">
+              <div class="code-header"><span class="code-lang">urls</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+              <pre>http://localhost:<span class="syn-num">8070</span>/dashboard  <span class="syn-cmt"># HTML dashboard (5s auto-refresh)</span>
+http://localhost:<span class="syn-num">3000</span>           <span class="syn-cmt"># Grafana — admin / shortz</span>
+http://localhost:<span class="syn-num">9090</span>           <span class="syn-cmt"># Prometheus</span>
+http://localhost:<span class="syn-num">8070</span>/gpu        <span class="syn-cmt"># GPU live stats</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     INTERACTIVE PIPELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="pipeline">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Pipeline</div></div>
+    <div class="sec-title">Five stages, one GPU</div>
+    <div class="sec-body">Each stage executes sequentially. XTTS and Whisper cannot coexist in VRAM — the pipeline loads one, runs it, unloads it, then loads the next.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> Click any stage to see VRAM usage, model strategy, and exact inputs/outputs.</div>
+  </div>
+
+  <div class="pipeline-container reveal">
+    <div class="pipeline-stages" id="pipeline-stages">
+      <div class="pipeline-stage active" onclick="selectStage(0)" data-idx="0">
+        <div class="ps-stage-icon">📝</div>
+        <div class="ps-stage-text">
+          <div class="ps-stage-name">Text Input</div>
+          <div class="ps-stage-tech">input/input.txt</div>
+        </div>
+        <span class="ps-stage-vram vram-none">0 MB</span>
+      </div>
+      <div class="stage-connector"><div class="stage-connector-line"></div></div>
+
+      <div class="pipeline-stage" onclick="selectStage(1)" data-idx="1">
+        <div class="ps-stage-icon">🎙</div>
+        <div class="ps-stage-text">
+          <div class="ps-stage-name">XTTS v2</div>
+          <div class="ps-stage-tech">Voice synthesis · GPU</div>
+        </div>
+        <span class="ps-stage-vram vram-high">~2 GB</span>
+      </div>
+      <div class="stage-connector"><div class="stage-connector-line"></div></div>
+
+      <div class="pipeline-stage" onclick="selectStage(2)" data-idx="2">
+        <div class="ps-stage-icon">🌊</div>
+        <div class="ps-stage-text">
+          <div class="ps-stage-name">Whisper</div>
+          <div class="ps-stage-tech">Word alignment · GPU</div>
+        </div>
+        <span class="ps-stage-vram vram-med">~1 GB</span>
+      </div>
+      <div class="stage-connector"><div class="stage-connector-line"></div></div>
+
+      <div class="pipeline-stage" onclick="selectStage(3)" data-idx="3">
+        <div class="ps-stage-icon">💬</div>
+        <div class="ps-stage-text">
+          <div class="ps-stage-name">ASS Subtitles</div>
+          <div class="ps-stage-tech">Karaoke generation · CPU</div>
+        </div>
+        <span class="ps-stage-vram vram-none">0 MB</span>
+      </div>
+      <div class="stage-connector"><div class="stage-connector-line"></div></div>
+
+      <div class="pipeline-stage" onclick="selectStage(4)" data-idx="4">
+        <div class="ps-stage-icon">🎬</div>
+        <div class="ps-stage-text">
+          <div class="ps-stage-name">FFmpeg</div>
+          <div class="ps-stage-tech">Video render · CPU/GPU</div>
+        </div>
+        <span class="ps-stage-vram vram-low">opt.</span>
+      </div>
+    </div>
+
+    <div class="pipeline-detail" id="pipeline-detail">
+      <div class="pd-content" id="pd-content"></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="architecture">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Architecture</div></div>
+    <div class="sec-title">System components</div>
+    <div class="sec-body">Four components communicate exclusively through Redis. The Supervisor orchestrates startup order, health gates, and automatic restart with exponential backoff.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> Click any component in the diagram to see its file, responsibility, and connection model.</div>
+  </div>
+
+  <div class="arch-svg-wrap reveal">
+    <svg viewBox="0 0 900 380" width="100%" style="display:block" id="arch-svg">
+      <defs>
+        <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+          <polygon points="0 0, 6 2, 0 4" fill="var(--line-strong)"/>
+        </marker>
+      </defs>
+
+      <!-- Supervisor -->
+      <g class="arch-node-group" onclick="archNodeClick('supervisor')">
+        <rect class="arch-box" x="300" y="20" width="300" height="52" rx="8"
+          fill="var(--bg-overlay)" stroke="var(--amber)" stroke-width="1"/>
+        <text class="arch-label" x="450" y="43" text-anchor="middle" fill="var(--amber)">SUPERVISOR</text>
+        <text class="arch-sub" x="450" y="57" text-anchor="middle" fill="var(--text-tertiary)">shortz_supervisor_v2.py</text>
+      </g>
+
+      <!-- Redis -->
+      <g class="arch-node-group" onclick="archNodeClick('redis')">
+        <rect class="arch-box" x="30" y="160" width="160" height="60" rx="8"
+          fill="var(--bg-overlay)" stroke="var(--rose)" stroke-width="1"/>
+        <text class="arch-label" x="110" y="185" text-anchor="middle" fill="var(--rose)">REDIS</text>
+        <text class="arch-sub" x="110" y="200" text-anchor="middle" fill="var(--text-tertiary)">Queue + State :6379</text>
+      </g>
+
+      <!-- Worker -->
+      <g class="arch-node-group" onclick="archNodeClick('worker')">
+        <rect class="arch-box" x="250" y="160" width="160" height="60" rx="8"
+          fill="var(--bg-overlay)" stroke="var(--teal)" stroke-width="1"/>
+        <text class="arch-label" x="330" y="185" text-anchor="middle" fill="var(--teal)">WORKER</text>
+        <text class="arch-sub" x="330" y="200" text-anchor="middle" fill="var(--text-tertiary)">GPU · Shortz.py</text>
+      </g>
+
+      <!-- API -->
+      <g class="arch-node-group" onclick="archNodeClick('api')">
+        <rect class="arch-box" x="490" y="160" width="160" height="60" rx="8"
+          fill="var(--bg-overlay)" stroke="var(--sky)" stroke-width="1"/>
+        <text class="arch-label" x="570" y="185" text-anchor="middle" fill="var(--sky)">FASTAPI</text>
+        <text class="arch-sub" x="570" y="200" text-anchor="middle" fill="var(--text-tertiary)">api_server.py :8000</text>
+      </g>
+
+      <!-- GUI -->
+      <g class="arch-node-group" onclick="archNodeClick('gui')">
+        <rect class="arch-box" x="710" y="160" width="160" height="60" rx="8"
+          fill="var(--bg-overlay)" stroke="var(--violet)" stroke-width="1"/>
+        <text class="arch-label" x="790" y="185" text-anchor="middle" fill="var(--violet)">GUI</text>
+        <text class="arch-sub" x="790" y="200" text-anchor="middle" fill="var(--text-tertiary)">PyQt6 · services/</text>
+      </g>
+
+      <!-- Monitoring -->
+      <g class="arch-node-group" onclick="archNodeClick('monitoring')">
+        <rect class="arch-box" x="250" y="300" width="400" height="60" rx="8"
+          fill="var(--bg-overlay)" stroke="var(--amber)" stroke-width="1" stroke-dasharray="5 3"/>
+        <text class="arch-label" x="450" y="325" text-anchor="middle" fill="var(--amber)">MONITORING STACK</text>
+        <text class="arch-sub" x="450" y="342" text-anchor="middle" fill="var(--text-tertiary)">monitoring_api :8070 · Prometheus :9090 · Grafana :3000</text>
+      </g>
+
+      <!-- Supervisor down arrows to all 4 -->
+      <line x1="390" y1="72" x2="200" y2="160" stroke="var(--line-mid)" stroke-width="1" marker-end="url(#arrowhead)"/>
+      <line x1="420" y1="72" x2="350" y2="160" stroke="var(--line-mid)" stroke-width="1" marker-end="url(#arrowhead)"/>
+      <line x1="470" y1="72" x2="560" y2="160" stroke="var(--line-mid)" stroke-width="1" marker-end="url(#arrowhead)"/>
+      <line x1="500" y1="72" x2="760" y2="160" stroke="var(--line-mid)" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+      <!-- Redis ↔ Worker (bidirectional) -->
+      <line x1="190" y1="186" x2="250" y2="186" stroke="var(--rose)" stroke-width="1.5" class="arch-conn" marker-end="url(#arrowhead)"/>
+      <line x1="250" y1="198" x2="190" y2="198" stroke="var(--teal)" stroke-width="1.5" class="arch-conn" style="animation-delay:-2s" marker-end="url(#arrowhead)"/>
+
+      <!-- GUI → API -->
+      <line x1="710" y1="190" x2="650" y2="190" stroke="var(--violet)" stroke-width="1.5" class="arch-conn" style="animation-delay:-1s" marker-end="url(#arrowhead)"/>
+      <line x1="650" y1="200" x2="710" y2="200" stroke="var(--sky)" stroke-width="1.5" class="arch-conn" style="animation-delay:-3s" marker-end="url(#arrowhead)"/>
+
+      <!-- API → Redis -->
+      <line x1="490" y1="190" x2="200" y2="190" stroke="var(--sky)" stroke-width="1.5" marker-end="url(#arrowhead)" stroke-dasharray="4 3">
+        <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.2s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- Worker → Monitoring -->
+      <line x1="330" y1="220" x2="380" y2="300" stroke="var(--line-mid)" stroke-width="1" stroke-dasharray="3 3"/>
+      <!-- API → Monitoring -->
+      <line x1="520" y1="220" x2="500" y2="300" stroke="var(--line-mid)" stroke-width="1" stroke-dasharray="3 3"/>
+    </svg>
+
+    <!-- Arch legend -->
+    <div class="arch-legend">
+      <div class="arch-legend-item"><div class="arch-legend-dot" style="background:var(--rose)"></div>Redis</div>
+      <div class="arch-legend-item"><div class="arch-legend-dot" style="background:var(--teal)"></div>Worker</div>
+      <div class="arch-legend-item"><div class="arch-legend-dot" style="background:var(--sky)"></div>API</div>
+      <div class="arch-legend-item"><div class="arch-legend-dot" style="background:var(--violet)"></div>GUI</div>
+      <div class="arch-legend-item"><div class="arch-legend-dot" style="background:var(--amber)"></div>Supervisor / Monitoring</div>
+      <div class="arch-legend-item" style="margin-left:auto">
+        <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="4 2"/></svg>
+        <span style="margin-left:4px">async / dashed = optional</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arch node info panel -->
+  <div id="arch-panel" style="display:none;margin-top:16px">
+    <div style="background:var(--bg-raised);border:1px solid var(--line-mid);border-radius:var(--radius-lg);padding:20px 24px" id="arch-panel-inner"></div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     DATA FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="dataflow">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Data Flow</div></div>
+    <div class="sec-title">Request to output</div>
+    <div class="sec-body">Every job traverses this exact path. Redis is the single source of truth at every step — nothing is communicated in-process.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> BLMOVE is the critical operation — it atomically dequeues and moves the job to a processing list, so a worker crash never loses the job.</div>
+  </div>
+
+  <div class="flow-diagram reveal">
+    <div class="flow-row">
+      <div class="flow-actor">Client</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-api">HTTP</span>
+        <span>POST /generate → <code>{"count": N, "voice_path": "..."}</code></span>
+        <span class="flow-mono">:8000</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">FastAPI</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-redis">ATOMIC</span>
+        <span>HSET <code>job:{id}</code> status=queued + RPUSH <code>shortz_jobs</code></span>
+        <span class="flow-mono">O(1)</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">Redis</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-queue">BLMOVE</span>
+        <span>Job moves <code>shortz_jobs</code> → <code>shortz_processing</code> (reliability list)</span>
+        <span class="flow-mono">blocking</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">Worker</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-gpu">GPU</span>
+        <span>Executes pipeline: Text → XTTS → Whisper → ASS → FFmpeg</span>
+        <span class="flow-mono">sequential</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">Worker</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-redis">HSET</span>
+        <span>Updates <code>job:{id}</code> stage + progress at each pipeline step</span>
+        <span class="flow-mono">live</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">Worker</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-redis">LREM</span>
+        <span>On complete/fail: removed from <code>shortz_processing</code>, status=complete/failed</span>
+        <span class="flow-mono">cleanup</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">Client</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-api">POLL</span>
+        <span>GET /status/{job_id} → reads HGETALL <code>job:{id}</code> every 2 s</span>
+        <span class="flow-mono">:8000</span>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-actor">Output</div>
+      <div class="flow-step">
+        <span class="flow-badge fb-cpu">FILE</span>
+        <span>output/{job_id}.mp4 · .wav · .ass written to mounted volume</span>
+        <span class="flow-mono">output/</span>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     OBSERVABILITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="observability">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Observability</div></div>
+    <div class="sec-title">Full visibility, zero guesswork</div>
+    <div class="sec-body">A dedicated monitoring API exposes queue state, GPU stats, and Prometheus metrics. Grafana provides pre-built dashboards out of the box.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> Click any endpoint row to preview the live JSON response shape.</div>
+  </div>
+
+  <div class="obs-grid reveal">
+    <!-- Prometheus Metrics -->
+    <div class="obs-card">
+      <div class="obs-card-label">
+        <span class="obs-card-icon">📈</span>
+        <span class="obs-card-title">Prometheus Metrics</span>
+        <span class="badge badge-amber" style="margin-left:auto">:8070/metrics</span>
+      </div>
+      <div class="metric-list">
+        <div class="metric-row">
+          <span class="metric-name">shortz_queue_length</span>
+          <span class="metric-type">gauge</span>
+          <span class="metric-val">2</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">shortz_jobs_processed</span>
+          <span class="metric-type">counter</span>
+          <span class="metric-val">42</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">shortz_gpu0_util_pct</span>
+          <span class="metric-type">gauge</span>
+          <span class="metric-val">78.0</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">shortz_workers_active</span>
+          <span class="metric-type">gauge</span>
+          <span class="metric-val">1</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">shortz_gpu0_mem_mb</span>
+          <span class="metric-type">gauge</span>
+          <span class="metric-val">4200</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Endpoints -->
+    <div class="obs-card">
+      <div class="obs-card-label">
+        <span class="obs-card-icon">🔌</span>
+        <span class="obs-card-title">Monitoring API</span>
+        <span class="badge badge-teal" style="margin-left:auto">:8070</span>
+      </div>
+      <div class="endpoint-list">
+        <div class="endpoint-row" onclick="showEp(this, 'queue')">
+          <span class="ep-method ep-get">GET</span>
+          <span class="ep-path">/queue</span>
+          <span class="ep-desc">Queue depth + job counts</span>
+        </div>
+        <div class="endpoint-row" onclick="showEp(this, 'gpu')">
+          <span class="ep-method ep-get">GET</span>
+          <span class="ep-path">/gpu</span>
+          <span class="ep-desc">nvidia-smi live stats</span>
+        </div>
+        <div class="endpoint-row" onclick="showEp(this, 'health')">
+          <span class="ep-method ep-get">GET</span>
+          <span class="ep-path">/health</span>
+          <span class="ep-desc">Redis + worker + GPU</span>
+        </div>
+        <div class="endpoint-row">
+          <span class="ep-method ep-get">GET</span>
+          <span class="ep-path">/metrics</span>
+          <span class="ep-desc">Prometheus exposition</span>
+        </div>
+        <div class="endpoint-row">
+          <span class="ep-method ep-get">GET</span>
+          <span class="ep-path">/dashboard</span>
+          <span class="ep-desc">HTML auto-refresh 5 s</span>
+        </div>
+        <div class="endpoint-row">
+          <span class="ep-method ep-get">GET</span>
+          <span class="ep-path">/api/jobs</span>
+          <span class="ep-desc">Recent job list JSON</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grafana -->
+    <div class="obs-card">
+      <div class="obs-card-label">
+        <span class="obs-card-icon">📊</span>
+        <span class="obs-card-title">Grafana Panels</span>
+        <span class="badge badge-violet" style="margin-left:auto">:3000</span>
+      </div>
+      <div class="grafana-panels">
+        <div class="gf-panel">
+          <div class="gf-panel-title">Queue Depth</div>
+          <div class="gf-panel-val" style="color:var(--amber)">2</div>
+          <div class="gf-sparkline"></div>
+        </div>
+        <div class="gf-panel">
+          <div class="gf-panel-title">Completed</div>
+          <div class="gf-panel-val" style="color:var(--teal)">42</div>
+          <div class="gf-sparkline" style="background:linear-gradient(to top,var(--amber-dim),transparent)"></div>
+        </div>
+        <div class="gf-panel">
+          <div class="gf-panel-title">GPU Util</div>
+          <div class="gf-panel-val" style="color:var(--rose)">78%</div>
+          <div class="gf-sparkline" style="background:linear-gradient(to top,var(--rose-dim),transparent)"></div>
+        </div>
+        <div class="gf-panel">
+          <div class="gf-panel-title">VRAM Used</div>
+          <div class="gf-panel-val" style="color:var(--violet)">4.2GB</div>
+          <div class="gf-sparkline" style="background:linear-gradient(to top,var(--violet-dim),transparent)"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-family:var(--font-mono);font-size:10px;color:var(--text-tertiary)">
+        Credentials: admin / shortz — pre-provisioned
+      </div>
+    </div>
+  </div>
+
+  <!-- Endpoint response preview -->
+  <div id="ep-preview" style="display:none;margin-top:12px" class="reveal">
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang" id="ep-preview-label">Response</span>
+        <button class="copy-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre id="ep-preview-code"></pre>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     GPU LIFECYCLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="gpu">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">GPU Lifecycle</div></div>
+    <div class="sec-title">Model load / unload sequence</div>
+    <div class="sec-body">XTTS and Whisper cannot coexist on 4 GB VRAM. The pipeline manages VRAM as a resource — loading each model only when needed, releasing it immediately after use.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> XTTS stays resident across jobs (saves 8 s/job). Whisper loads per-job and is freed immediately — total peak is ~3 GB, leaving 1 GB headroom.</div>
+  </div>
+
+  <div class="gpu-timeline reveal">
+    <div class="gpu-tl-header">
+      <span class="t-label">VRAM occupation across one job lifecycle</span>
+      <div class="gpu-tl-legend">
+        <div class="gtl-item"><div class="gtl-swatch" style="background:var(--rose)"></div>XTTS v2</div>
+        <div class="gtl-item"><div class="gtl-swatch" style="background:var(--teal)"></div>Whisper</div>
+        <div class="gtl-item"><div class="gtl-swatch" style="background:var(--sky)"></div>FFmpeg</div>
+        <div class="gtl-item"><div class="gtl-swatch" style="background:var(--bg-overlay)"></div>Idle</div>
+      </div>
+    </div>
+
+    <div class="gpu-tl-rows">
+      <!-- Row 1: Worker startup -->
+      <div class="gpu-tl-row">
+        <div class="gpu-tl-label">Startup</div>
+        <div class="gpu-tl-track">
+          <div class="gpu-tl-bar bar-xtts bar-active" style="left:0%;width:30%">XTTS LOAD (~8s)</div>
+          <div class="gpu-tl-bar bar-idle" style="left:30%;width:70%;font-size:8px;color:var(--text-disabled)">model resident, waiting for jobs</div>
+        </div>
+      </div>
+
+      <!-- Row 2: Voice stage -->
+      <div class="gpu-tl-row">
+        <div class="gpu-tl-label">Voice</div>
+        <div class="gpu-tl-track">
+          <div class="gpu-tl-bar bar-idle" style="left:0%;width:20%"></div>
+          <div class="gpu-tl-bar bar-xtts bar-active" style="left:20%;width:50%">XTTS INFERENCE (resident ~2 GB)</div>
+          <div class="gpu-tl-bar bar-idle" style="left:70%;width:30%"></div>
+        </div>
+      </div>
+
+      <!-- Row 3: Whisper stage — XTTS unloaded first -->
+      <div class="gpu-tl-row">
+        <div class="gpu-tl-label">Alignment</div>
+        <div class="gpu-tl-track">
+          <div class="gpu-tl-bar bar-idle" style="left:0%;width:30%"></div>
+          <div class="gpu-tl-bar" style="left:30%;width:8%;background:var(--rose-dim);border:1px solid var(--rose);color:var(--rose);font-size:8px">UNLOAD</div>
+          <div class="gpu-tl-bar bar-whisp bar-active" style="left:38%;width:38%">WHISPER LOAD + INFERENCE (~1 GB)</div>
+          <div class="gpu-tl-bar" style="left:76%;width:7%;background:var(--teal-dim);border:1px solid var(--teal);color:var(--teal);font-size:8px">UNLOAD</div>
+          <div class="gpu-tl-bar bar-idle" style="left:83%;width:17%"></div>
+        </div>
+      </div>
+
+      <!-- Row 4: Subtitles (CPU) -->
+      <div class="gpu-tl-row">
+        <div class="gpu-tl-label">Subtitles</div>
+        <div class="gpu-tl-track">
+          <div class="gpu-tl-bar bar-idle" style="left:0%;width:60%;font-size:9px">GPU idle — CPU only</div>
+          <div class="gpu-tl-bar" style="left:60%;width:25%;background:var(--sky-dim);border:1px solid var(--sky);color:var(--sky)">ASS CPU</div>
+          <div class="gpu-tl-bar bar-idle" style="left:85%;width:15%"></div>
+        </div>
+      </div>
+
+      <!-- Row 5: FFmpeg -->
+      <div class="gpu-tl-row">
+        <div class="gpu-tl-label">Render</div>
+        <div class="gpu-tl-track">
+          <div class="gpu-tl-bar bar-idle" style="left:0%;width:75%"></div>
+          <div class="gpu-tl-bar bar-ffmpeg bar-active" style="left:75%;width:25%">FFMPEG</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time axis -->
+    <div class="gpu-tl-tick-row">
+      <span class="gpu-tl-tick">0s</span>
+      <span class="gpu-tl-tick">15s</span>
+      <span class="gpu-tl-tick">30s</span>
+      <span class="gpu-tl-tick">45s</span>
+      <span class="gpu-tl-tick">60s</span>
+      <span class="gpu-tl-tick">75s</span>
+      <span class="gpu-tl-tick">~90s</span>
+    </div>
+
+    <!-- VRAM capacity bar -->
+    <div class="gpu-capacity-wrap">
+      <div class="gpu-capacity-label">
+        <span class="t-label">RTX 3050 VRAM (4 GB total)</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-tertiary)">Models cannot coexist — sequential loading enforced</span>
+      </div>
+      <div class="gpu-capacity-track">
+        <div class="gpu-cap-segment seg-xtts" style="width:50%"></div>
+      </div>
+      <div class="gpu-cap-legend">
+        <div class="gcl-item"><div class="gcl-dot" style="background:var(--rose)"></div>XTTS v2 ~2 GB (50%)</div>
+        <div class="gcl-item"><div class="gcl-dot" style="background:var(--teal)"></div>Whisper ~1 GB (25%)</div>
+        <div class="gcl-item"><div class="gcl-dot" style="background:var(--bg-overlay);border:1px solid var(--line-mid)"></div>Free ~1 GB headroom</div>
+        <div class="gcl-item" style="color:var(--rose);margin-left:auto">⚠ XTTS + Whisper = ~3 GB — fits but no slack for FFmpeg nvenc</div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     CONSTRAINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="constraints">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Constraints</div></div>
+    <div class="sec-title">Honest trade-offs</div>
+    <div class="sec-body">Every architectural decision here was forced by hardware. These are the constraints, and the designs they drove.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> The scale-out path is simple: add more workers across more GPUs. The Redis queue handles coordination automatically.</div>
+  </div>
+
+  <div class="constraints-grid reveal">
+    <div class="constraint-card cc-limit">
+      <span class="cc-icon">⚡</span>
+      <div class="cc-title">XTTS + Whisper cannot coexist</div>
+      <div class="cc-body">XTTS v2 uses ~2 GB and Whisper Small ~1 GB. Together they leave no headroom on 4 GB VRAM. The pipeline enforces sequential loading: XTTS stays resident across jobs; Whisper loads per-job and is immediately freed after alignment.</div>
+      <span class="cc-tag ct-rose">Hardware limit</span>
+    </div>
+
+    <div class="constraint-card cc-tradeoff">
+      <span class="cc-icon">⏱</span>
+      <div class="cc-title">Sequential = no pipeline parallelism</div>
+      <div class="cc-body">Jobs are processed one at a time. A batch of 10 waits in the Redis queue — they do not run in parallel. This is intentional: GPU memory is the bottleneck, not CPU or I/O. Multiple workers across multiple GPUs is the scale-out path.</div>
+      <span class="cc-tag ct-amber">Design trade-off</span>
+    </div>
+
+    <div class="constraint-card cc-design">
+      <span class="cc-icon">🔁</span>
+      <div class="cc-title">XTTS startup latency is amortised</div>
+      <div class="cc-body">Loading XTTS takes ~8 seconds. Rather than loading it per-job (which would add 8 s to every video), the worker loads XTTS once at startup and keeps it resident. Only Whisper loads/unloads per-job (fast: ~2 s).</div>
+      <span class="cc-tag ct-teal">Design decision</span>
+    </div>
+
+    <div class="constraint-card cc-scale">
+      <span class="cc-icon">📦</span>
+      <div class="cc-title">Single Redis as the coordination layer</div>
+      <div class="cc-body">All inter-process state — job status, progress, stage, voice path — lives in Redis hashes. No shared memory, no file locks. This makes it trivially horizontally scalable: add workers by running more Docker containers.</div>
+      <span class="cc-tag ct-violet">Scalability</span>
+    </div>
+
+    <div class="constraint-card cc-limit">
+      <span class="cc-icon">🖥</span>
+      <div class="cc-title">Legacy GUI mode is dangerous</div>
+      <div class="cc-body">The legacy <code style="font-family:var(--font-mono);font-size:11px">main.pyw</code> path loads XTTS directly in the GUI process. On 4 GB VRAM, this conflicts with the worker and causes OOM crashes. Always use <code style="font-family:var(--font-mono);font-size:11px">services/gui_main.py</code> (API-bridged mode).</div>
+      <span class="cc-tag ct-rose">Known hazard</span>
+    </div>
+
+    <div class="constraint-card cc-scale">
+      <span class="cc-icon">⚙</span>
+      <div class="cc-title">FFmpeg GPU acceleration is optional</div>
+      <div class="cc-body">h264_nvenc is used when available, but FFmpeg falls back to libx264 on CPU automatically. This means the render stage works on CPU-only machines — useful for testing without a CUDA-capable GPU present.</div>
+      <span class="cc-tag ct-teal">Graceful degradation</span>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     DEEP DIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="section" id="deepdive">
+<div class="wrap">
+  <div class="sec-header reveal">
+    <div class="sec-eyebrow"><div class="sec-eyebrow-text">Deep Dive</div></div>
+    <div class="sec-title">For engineers</div>
+    <div class="sec-body">Full technical detail on the Redis schema, threading model, startup sequence, and failure handling. Click to expand.</div>
+    <div class="sec-takeaway"><em class="sec-takeaway-icon">→</em> The BLMOVE + processing list pattern in section 01 is the reliability cornerstone — understand this first.</div>
+  </div>
+
+  <div class="deep-dive reveal">
+
+    <!-- Redis Schema -->
+    <div class="dd-item open" id="dd-redis">
+      <button class="dd-trigger" onclick="toggleDD('dd-redis')">
+        <span class="dd-num">01</span>
+        <span class="dd-title">Redis Schema</span>
+        <span class="dd-arrow">▶</span>
+      </button>
+      <div class="dd-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div class="t-label" style="margin-bottom:10px">Queue keys</div>
+            <table class="dd-table">
+              <thead><tr><th>Key</th><th>Type</th><th>Purpose</th></tr></thead>
+              <tbody>
+                <tr><td class="t-mono" style="color:var(--rose)">shortz_jobs</td><td><span class="badge badge-rose">LIST</span></td><td class="t-small">Pending FIFO queue</td></tr>
+                <tr><td class="t-mono" style="color:var(--amber)">shortz_processing</td><td><span class="badge badge-amber">LIST</span></td><td class="t-small">In-flight reliability</td></tr>
+                <tr><td class="t-mono" style="color:var(--violet)">job:{id}</td><td><span class="badge badge-violet">HASH</span></td><td class="t-small">Per-job state</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="t-label" style="margin-bottom:10px">Job hash fields</div>
+            <table class="dd-table">
+              <thead><tr><th>Field</th><th>Values</th></tr></thead>
+              <tbody>
+                <tr><td class="t-mono">status</td><td class="t-small">queued | running | complete | failed</td></tr>
+                <tr><td class="t-mono">progress</td><td class="t-small">"0" .. "100"</td></tr>
+                <tr><td class="t-mono">stage</td><td class="t-small">waiting | text | voice | alignment | subtitles | render | done</td></tr>
+                <tr><td class="t-mono">voice_path</td><td class="t-small">path to .wav sample</td></tr>
+                <tr><td class="t-mono">created</td><td class="t-small">unix timestamp float</td></tr>
+                <tr><td class="t-mono">updated</td><td class="t-small">unix timestamp float</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="t-label" style="margin-bottom:10px">Queue operations</div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">redis — critical ops</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="syn-cmt"># Enqueue (atomic pipeline)</span>
+HSET job:{id} status queued progress 0 stage waiting created {ts}
+RPUSH shortz_jobs {id}
+
+<span class="syn-cmt"># Dequeue (BLMOVE — Redis 6.2+, blocks until job available)</span>
+BLMOVE shortz_jobs shortz_processing RIGHT LEFT 0
+
+<span class="syn-cmt"># Fallback (Redis &lt;6.2)</span>
+BRPOPLPUSH shortz_jobs shortz_processing 0
+
+<span class="syn-cmt"># Complete / cleanup</span>
+HSET job:{id} status complete progress 100 stage done
+LREM shortz_processing 1 {id}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Threading Model -->
+    <div class="dd-item" id="dd-threading">
+      <button class="dd-trigger" onclick="toggleDD('dd-threading')">
+        <span class="dd-num">02</span>
+        <span class="dd-title">Threading Model</span>
+        <span class="dd-arrow">▶</span>
+      </button>
+      <div class="dd-body">
+        <div class="t-label" style="margin-bottom:12px">GUI QThreads — all network I/O off the Qt event loop</div>
+        <div class="thread-tree">
+          <div class="tt-row">
+            <span class="tt-name">StatusPollerThread</span>
+            <span class="tt-purpose">Polls /status/{id} every 2 s</span>
+            <span class="tt-signal">result_ready(dict)</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-name">HealthCheckThread</span>
+            <span class="tt-purpose">Polls /health</span>
+            <span class="tt-signal">health_updated(dict)</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-name">JobSubmitterThread</span>
+            <span class="tt-purpose">POST /generate</span>
+            <span class="tt-signal">jobs_created(list)</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-name">ActiveJobDetectorThread</span>
+            <span class="tt-purpose">GET /active_job on GUI startup</span>
+            <span class="tt-signal">job_found(str)</span>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="t-label" style="margin-bottom:10px">FastAPI — async model</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.75">
+          Runs on uvicorn's async event loop. Blocking Redis calls are offloaded via <code class="t-mono">asyncio.to_thread()</code> — the event loop never blocks. Redis client is <strong style="color:var(--text-primary)">lazy-initialised</strong> on first request, not at import — this lets the API start before Redis is ready.
+        </div>
+        <div class="divider"></div>
+        <div class="t-label" style="margin-bottom:10px">Worker — synchronous blocking loop</div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">pseudocode</span></div>
+          <pre><span class="syn-kw">while</span> True:
+    PING redis <span class="syn-cmt"># verify connection before blocking</span>
+    job_id = BLMOVE(shortz_jobs, shortz_processing)  <span class="syn-cmt"># blocks</span>
+    <span class="syn-kw">try</span>:
+        run_pipeline(job_id)   <span class="syn-cmt"># Text → XTTS → Whisper → ASS → FFmpeg</span>
+        HSET job:{id} status=complete
+    <span class="syn-kw">except</span>:
+        HSET job:{id} status=failed error=traceback
+        reconnect_with_backoff()
+    LREM shortz_processing job_id</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Startup Sequence -->
+    <div class="dd-item" id="dd-startup">
+      <button class="dd-trigger" onclick="toggleDD('dd-startup')">
+        <span class="dd-num">03</span>
+        <span class="dd-title">Startup Sequence</span>
+        <span class="dd-arrow">▶</span>
+      </button>
+      <div class="dd-body">
+        <div class="startup-seq">
+          <div class="ss-item">
+            <div class="ss-n done">1</div>
+            <div class="ss-body"><div class="ss-title">Verify WSL</div><div class="ss-detail">Check Windows Subsystem for Linux availability for Redis</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n done">2</div>
+            <div class="ss-body"><div class="ss-title">Start Redis</div><div class="ss-detail">Via WSL — retry PING loop until PONG received</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n done">3</div>
+            <div class="ss-body"><div class="ss-title">Start Worker</div><div class="ss-detail">Supervisor waits for XTTS voice model to finish loading (~8 s) before proceeding — prevents race condition with API startup</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n done">4</div>
+            <div class="ss-body"><div class="ss-title">Start FastAPI</div><div class="ss-detail">Via Uvicorn on :8000</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n done">5</div>
+            <div class="ss-body"><div class="ss-title">Health gate</div><div class="ss-detail">Poll GET /health up to 30 s — does not start GUI until API responds 200</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n done">6</div>
+            <div class="ss-body"><div class="ss-title">Start GUI</div><div class="ss-detail">QTimer.singleShot(500 ms) → ActiveJobDetectorThread → if job found, attach poller; if not, POST /generate</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n done">7</div>
+            <div class="ss-body"><div class="ss-title">Start Monitoring API</div><div class="ss-detail">Port 8070 — queue stats, GPU metrics, Prometheus endpoint</div></div>
+          </div>
+          <div class="ss-item">
+            <div class="ss-n">8</div>
+            <div class="ss-body"><div class="ss-title">Monitor loop</div><div class="ss-detail">5 s heartbeat interval — exponential restart backoff: 2 s → 4 s → 8 s → ... → 60 s max, max 10 attempts per service</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Failure Handling -->
+    <div class="dd-item" id="dd-failure">
+      <button class="dd-trigger" onclick="toggleDD('dd-failure')">
+        <span class="dd-num">04</span>
+        <span class="dd-title">Failure Handling</span>
+        <span class="dd-arrow">▶</span>
+      </button>
+      <div class="dd-body">
+        <div class="failure-grid">
+          <div class="fgrid-item">
+            <div class="fgi-layer">API Layer</div>
+            <div class="fgi-strategy">Global exception handler catches all unhandled errors → returns structured 500 JSON. API never crashes — uvicorn process stays alive.</div>
+          </div>
+          <div class="fgrid-item">
+            <div class="fgi-layer">Worker</div>
+            <div class="fgi-strategy">Per-job try/except — failed jobs are marked in Redis (<code class="t-mono">status=failed, error=traceback</code>) and removed from <code class="t-mono">shortz_processing</code>. Redis reconnect with exponential backoff.</div>
+          </div>
+          <div class="fgrid-item">
+            <div class="fgi-layer">GUI</div>
+            <div class="fgi-strategy">Per-thread error signals with exponential poll backoff. QueuedConnection for all signal-slot wiring ensures thread safety. QMutex protects all shared state.</div>
+          </div>
+          <div class="fgrid-item">
+            <div class="fgi-layer">Supervisor</div>
+            <div class="fgi-strategy">Restart backoff: 2 s → 4 s → 8 s → 60 s max. Maximum 10 attempts per service before giving up and alerting operator. All restarts logged to <code class="t-mono">system.log</code>.</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="t-label" style="margin-bottom:10px">Reliability guarantee: BLMOVE + processing list</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.75">
+          Jobs are moved — not consumed — from <code class="t-mono">shortz_jobs</code> to <code class="t-mono">shortz_processing</code> atomically. If a worker crashes mid-job, the job ID remains in <code class="t-mono">shortz_processing</code> and can be recovered by an operator or a future requeue sweep. This is the Redis "reliable queue" pattern.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end deep-dive -->
+</div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     FOOTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<footer>
+<div class="wrap">
+  <div class="footer-inner">
+    <div>
+      <div class="footer-brand">⬡ SHORTZ</div>
+      <div class="footer-meta">AI Video Pipeline · Local GPU · MIT License</div>
+    </div>
+    <div class="footer-links">
+      <a href="#pipeline" class="footer-link">Pipeline</a>
+      <a href="#architecture" class="footer-link">Architecture</a>
+      <a href="#observability" class="footer-link">Observability</a>
+      <a href="#deepdive" class="footer-link">Deep Dive</a>
+    </div>
+  </div>
+</div>
+</footer>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     GITHUB FAB
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="gh-fab">
+  <a class="gh-fab-btn"
+     href="https://github.com/mrankitpanicker/shortz-ai-pipeline"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="View full repository on GitHub">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+    </svg>
+    <div class="gh-fab-tooltip">View full repository on GitHub</div>
+  </a>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     JAVASCRIPT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<script>
+/* ── Theme ── */
+let currentTheme = localStorage.getItem('sz-theme') || 'dark';
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('theme-label').textContent = t === 'dark' ? 'Light' : 'Night';
+  localStorage.setItem('sz-theme', t);
+  currentTheme = t;
+}
+applyTheme(currentTheme);
+
+function toggleTheme() {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+}
+
+/* ── Nav active + scroll ── */
+const navLinks = document.querySelectorAll('.nav-link[data-sec]');
+const sectionIds = ['hero','pipeline','architecture','dataflow','observability','gpu','constraints','deepdive'];
+
+window.addEventListener('scroll', () => {
+  const nav = document.getElementById('nav');
+  nav.classList.toggle('scrolled', window.scrollY > 10);
+
+  let current = 'hero';
+  sectionIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 120) current = id;
+  });
+  navLinks.forEach(l => l.classList.toggle('active', l.dataset.sec === current));
+}, {passive:true});
+
+/* ── Reveal on scroll ── */
+const revealObs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, {threshold: 0.08, rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+// Trigger above-fold items immediately
+requestAnimationFrame(() => {
+  document.querySelectorAll('.reveal').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight) el.classList.add('visible');
+  });
+});
+
+/* ── Quick start tabs ── */
+function switchQS(id, btn) {
+  document.querySelectorAll('[id^="qs-"]').forEach(p => p.classList.remove('active'));
+  document.getElementById('qs-'+id).classList.add('active');
+  btn.closest('.qs-tabs').querySelectorAll('.qs-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ── Copy code ── */
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+/* ── Pipeline stage data ── */
+const STAGES = [
+  {
+    name: 'Text Input',
+    vram: 0, vramPct: 0, vramColor: 'var(--text-tertiary)',
+    badge: 'CPU only',
+    desc: 'The pipeline reads the script from <code>input/input.txt</code>. Batch mode is supported: submit 1–10 jobs per API call via POST /generate. Each job receives a unique <code>job_id</code> tracked through all subsequent stages. Jobs are enqueued atomically via HSET + RPUSH into the Redis queue.',
+    details: [
+      {k:'Input', v:'input/input.txt — plain text script'},
+      {k:'VRAM', v:'0 MB — no GPU required'},
+      {k:'Output', v:'job_id enqueued in Redis shortz_jobs list'},
+      {k:'Batch', v:'1–10 jobs per API call, each independent'},
+    ]
+  },
+  {
+    name: 'XTTS v2 Voice Synthesis',
+    vram: 2000, vramPct: 50, vramColor: 'var(--rose)',
+    badge: 'GPU ~2 GB',
+    desc: 'Coqui XTTS-v2 clones a target voice from a 3–10 second <code>.wav</code> sample and synthesizes full-length speech from the script. The XTTS model is loaded <strong>once at worker startup</strong> and stays resident across all jobs — eliminating the 8 s load penalty on every video. Uses approximately 2 GB VRAM.',
+    details: [
+      {k:'Model', v:'Coqui XTTS-v2 (multilingual)'},
+      {k:'VRAM', v:'~2 GB — loaded at startup, resident'},
+      {k:'Input', v:'Script text + voice sample .wav'},
+      {k:'Output', v:'Full-length synthesized audio .wav'},
+      {k:'Strategy', v:'Loaded once, shared across all jobs'},
+    ]
+  },
+  {
+    name: 'Whisper Alignment',
+    vram: 1000, vramPct: 25, vramColor: 'var(--amber)',
+    badge: 'GPU ~1 GB',
+    desc: 'faster-whisper (4× inference speed over standard Whisper) processes the synthesized audio to extract <strong>word-level timestamps</strong>. These timestamps drive the subtitle animation timing. XTTS must be unloaded first — Whisper loads per-job and is immediately unloaded after alignment to free the VRAM slot.',
+    details: [
+      {k:'Model', v:'faster-whisper (Whisper Small)'},
+      {k:'VRAM', v:'~1 GB — loaded per-job, unloaded after'},
+      {k:'Input', v:'Synthesized voice .wav'},
+      {k:'Output', v:'Word-level timestamp array .json'},
+      {k:'Note', v:'XTTS must be unloaded first on 4 GB GPU'},
+    ]
+  },
+  {
+    name: 'ASS Subtitle Generation',
+    vram: 0, vramPct: 0, vramColor: 'var(--text-tertiary)',
+    badge: 'CPU only',
+    desc: 'Word timestamps from Whisper are converted to Advanced SubStation Alpha (<code>.ass</code>) format. Each word receives exact on/off timing for karaoke-style highlight animations. This stage is entirely CPU-bound — zero VRAM usage. The output is a fully-timed subtitle file ready for FFmpeg burn-in.',
+    details: [
+      {k:'Format', v:'Advanced SubStation Alpha (.ass)'},
+      {k:'VRAM', v:'0 MB — CPU only'},
+      {k:'Input', v:'Word timestamp .json from Whisper'},
+      {k:'Output', v:'Animated karaoke subtitle .ass file'},
+      {k:'Effect', v:'Per-word highlight pop-on timing'},
+    ]
+  },
+  {
+    name: 'FFmpeg Render',
+    vram: 0, vramPct: 0, vramColor: 'var(--teal)',
+    badge: 'CPU/GPU',
+    desc: 'FFmpeg composites the final video: background image or video + synthesized audio + burned-in ASS subtitle animation. Output is a self-contained 1080×1920 <code>.mp4</code>. GPU-accelerated via <code>h264_nvenc</code> when available — automatically falls back to CPU <code>libx264</code> without configuration.',
+    details: [
+      {k:'Resolution', v:'1080×1920 (portrait short-form)'},
+      {k:'Encoder', v:'h264_nvenc (GPU) or libx264 (CPU)'},
+      {k:'Input', v:'Background + .wav + .ass subtitles'},
+      {k:'Output', v:'output/{job_id}.mp4'},
+      {k:'Audio', v:'AAC-encoded synthesized voice track'},
+    ]
+  }
+];
+
+let activeStage = 0;
+
+function renderStageDetail(idx) {
+  const s = STAGES[idx];
+  const vramBar = s.vramPct > 0
+    ? `<div class="pd-vram-section">
+        <div class="pd-vram-label">
+          <span class="t-label">VRAM usage</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:${s.vramColor}">${s.vram > 0 ? '~'+s.vram+' MB' : 'None'}</span>
+        </div>
+        <div class="pd-vram-track">
+          <div class="pd-vram-fill" style="width:${s.vramPct}%;background:${s.vramColor}"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span class="t-small">0 GB</span>
+          <span class="t-small">4 GB (RTX 3050)</span>
+        </div>
+      </div>` : '';
+
+  const detailRows = s.details.map(d => `
+    <div class="pd-detail-row">
+      <div class="pd-detail-key">${d.k}</div>
+      <div class="pd-detail-value">${d.v}</div>
+    </div>`).join('');
+
+  document.getElementById('pd-content').innerHTML = `
+    <div class="pd-header">
+      <div class="pd-title">${s.name}</div>
+      <span class="pd-vram-big ${s.vramPct > 40 ? 'badge-rose' : s.vramPct > 0 ? 'badge-amber' : 'badge-teal'} badge">${s.badge}</span>
+    </div>
+    <div class="pd-desc">${s.desc}</div>
+    ${vramBar}
+    <div class="pd-details">${detailRows}</div>
+  `;
+}
+
+function selectStage(idx) {
+  activeStage = idx;
+  document.querySelectorAll('.pipeline-stage').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  renderStageDetail(idx);
+}
+
+// Init first stage
+renderStageDetail(0);
+
+/* ── Architecture node info ── */
+const ARCH_DATA = {
+  supervisor: {
+    title: 'Supervisor', color: 'var(--amber)',
+    body: 'Launches all components in ordered sequence with health gates between each. Runs a 5 s monitor loop with exponential restart backoff (2 s → 60 s, max 10 attempts). All restart events logged to system.log.',
+    file: 'system/shortz_supervisor_v2.py'
+  },
+  redis: {
+    title: 'Redis :6379', color: 'var(--rose)',
+    body: 'Single coordination layer. Two lists (shortz_jobs, shortz_processing) + one hash per job. BLMOVE provides atomic dequeue + reliability in one operation. No job can be lost even on worker crash.',
+    file: 'redis_queue.py'
+  },
+  worker: {
+    title: 'GPU Worker', color: 'var(--teal)',
+    body: 'Synchronous blocking loop. PING-verifies Redis before each BLMOVE. Executes Shortz.main_generate() per job. Per-job try/except with reconnect backoff. Updates Redis at each pipeline stage transition.',
+    file: 'worker.py + Shortz.py'
+  },
+  api: {
+    title: 'FastAPI :8000', color: 'var(--sky)',
+    body: 'Async event loop via Uvicorn. Blocking Redis calls via asyncio.to_thread(). Lazy Redis init — starts before Redis is ready. Global exception handler prevents crashes. Endpoints: /generate, /status, /active_job, /health.',
+    file: 'api_server.py'
+  },
+  gui: {
+    title: 'PyQt6 GUI', color: 'var(--violet)',
+    body: 'API-bridged operator console. Four QThread workers handle all network I/O. QMutex protects shared state. All signal→slot connections use QueuedConnection. Never touches Shortz.py directly.',
+    file: 'services/gui_main.py'
+  },
+  monitoring: {
+    title: 'Monitoring Stack', color: 'var(--amber)',
+    body: 'Custom FastAPI monitoring server on :8070 with /queue, /metrics, /gpu, /health, /dashboard, /api/jobs. Prometheus scrapes /metrics every 15 s. Grafana uses pre-provisioned datasource and dashboards.',
+    file: 'monitoring/monitoring_api.py'
+  }
+};
+
+let activeArchNode = null;
+function archNodeClick(id) {
+  const panel = document.getElementById('arch-panel');
+  const inner = document.getElementById('arch-panel-inner');
+  if (activeArchNode === id) { panel.style.display = 'none'; activeArchNode = null; return; }
+  activeArchNode = id;
+  const d = ARCH_DATA[id];
+  inner.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:20px">
+      <div style="flex:1">
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:${d.color};margin-bottom:6px;letter-spacing:.08em;text-transform:uppercase">${d.title}</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.75">${d.body}</div>
+      </div>
+      <div style="flex-shrink:0;font-family:var(--font-mono);font-size:10px;color:var(--text-tertiary);background:var(--bg-surface);padding:4px 10px;border-radius:4px;border:1px solid var(--line-mid);white-space:nowrap">${d.file}</div>
+    </div>`;
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ── Observability endpoint responses ── */
+const EP_RESPONSES = {
+  queue: {
+    label: 'GET /queue',
+    code: `{
+  <span class="syn-key">"queue_length"</span>:    <span class="syn-num">2</span>,
+  <span class="syn-key">"workers_active"</span>:   <span class="syn-num">1</span>,
+  <span class="syn-key">"jobs_processing"</span>: <span class="syn-num">1</span>,
+  <span class="syn-key">"total_jobs"</span>:       <span class="syn-num">15</span>,
+  <span class="syn-key">"jobs_by_status"</span>: {
+    <span class="syn-key">"queued"</span>:   <span class="syn-num">2</span>,
+    <span class="syn-key">"running"</span>:  <span class="syn-num">1</span>,
+    <span class="syn-key">"complete"</span>: <span class="syn-num">10</span>,
+    <span class="syn-key">"failed"</span>:   <span class="syn-num">2</span>
+  }
+}`
+  },
+  gpu: {
+    label: 'GET /gpu',
+    code: `{
+  <span class="syn-key">"available"</span>: <span class="syn-val">true</span>,
+  <span class="syn-key">"gpus"</span>: [{
+    <span class="syn-key">"index"</span>:          <span class="syn-num">0</span>,
+    <span class="syn-key">"name"</span>:           <span class="syn-str">"NVIDIA RTX 3050"</span>,
+    <span class="syn-key">"memory_used_mb"</span>: <span class="syn-num">2048.0</span>,
+    <span class="syn-key">"memory_total_mb"</span>:<span class="syn-num">4096.0</span>,
+    <span class="syn-key">"gpu_util_pct"</span>:   <span class="syn-num">78.0</span>,
+    <span class="syn-key">"temperature_c"</span>:  <span class="syn-num">62.0</span>
+  }]
+}`
+  },
+  health: {
+    label: 'GET /health',
+    code: `{
+  <span class="syn-key">"redis_status"</span>:  <span class="syn-str">"healthy"</span>,
+  <span class="syn-key">"api_status"</span>:    <span class="syn-str">"healthy"</span>,
+  <span class="syn-key">"worker_status"</span>: <span class="syn-str">"active"</span>,
+  <span class="syn-key">"gpu_status"</span>:    <span class="syn-str">"available"</span>,
+  <span class="syn-key">"uptime_seconds"</span>:<span class="syn-num">3621.5</span>
+}`
+  }
+};
+
+let activeEp = null;
+function showEp(row, id) {
+  const preview = document.getElementById('ep-preview');
+  // Clear previous active row
+  document.querySelectorAll('.endpoint-row.ep-active').forEach(r => r.classList.remove('ep-active'));
+
+  if (activeEp === id) {
+    preview.style.display = 'none'; activeEp = null; return;
+  }
+  activeEp = id;
+  row.classList.add('ep-active');
+  const d = EP_RESPONSES[id];
+  if (!d) return;
+  document.getElementById('ep-preview-label').textContent = d.label;
+  document.getElementById('ep-preview-code').innerHTML = d.code;
+  preview.style.display = 'block';
+  preview.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ── Deep dive accordion ── */
+function toggleDD(id) {
+  const item = document.getElementById(id);
+  item.classList.toggle('open');
+}
+
+/* ── Smooth scroll helper for nav ── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) { e.preventDefault(); target.scrollIntoView({behavior:'smooth',block:'start'}); }
+  });
+});
+</script>
+</body>
+</html>
