@@ -112,7 +112,7 @@ curl -X POST http://localhost:8000/generate \
 
 | Resource | Minimum | Recommended |
 |----------|---------|-------------|
-| GPU | GTX 1650 (4 GB) | RTX 3060 (8 GB) |
+| GPU | GTX 1650 (4 GB) | RTX 3050 (4 GB) |
 | RAM | 8 GB | 16 GB |
 | CPU | 4 cores | 8 cores |
 | Disk | 10 GB | 50 GB |
